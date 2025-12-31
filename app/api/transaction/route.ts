@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
  * XRPL EVM Testnet RPC endpoint
  */
 const RPC_URL =
+  process.env.XRPL_EVM_TESTNET_RPC_URL ||
   process.env.NEXT_PUBLIC_XRPL_RPC_URL ||
   "https://rpc.testnet.xrplevm.org";
 
@@ -52,6 +53,8 @@ export async function POST(request: NextRequest) {
         {
           error: "Transaction failed",
           message: data.error.message || "Unknown error",
+          code: data.error.code,
+          data: data.error.data,
         },
         { status: 400 }
       );

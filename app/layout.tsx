@@ -18,12 +18,9 @@ export const metadata: Metadata = {
   title: "LXUSD Wallet",
   description: "XRPL EVM Wallet - Send and receive tokens seamlessly",
   icons: {
-    icon: [
-      { url: "/look-logo.png", type: "image/png" },
-      { url: "/look-logo.svg", type: "image/svg+xml" },
-    ],
-    apple: "/look-logo.png",
-    shortcut: "/look-logo.png",
+    icon: [{ url: "/lxusd-logo.svg", type: "image/svg+xml" }],
+    apple: "/lxusd-logo.svg",
+    shortcut: "/lxusd-logo.svg",
   },
 };
 
@@ -46,9 +43,7 @@ export default function RootLayout({
           strategy="beforeInteractive"
         />
       </head>
-      <body className={`${inter.variable} antialiased`}>
-        {children}
-      </body>
+      <body className={`${inter.variable} antialiased`}>{children}</body>
     </html>
   );
 }

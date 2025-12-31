@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Send,
@@ -28,6 +28,15 @@ import dynamic from "next/dynamic";
 const EXPLORER_TX_BASE =
   process.env.NEXT_PUBLIC_EXPLORER_TX_BASE ||
   "https://explorer.testnet.xrplevm.org/tx/";
+
+type ToastKind = "info" | "success" | "error";
+type ToastState = {
+  id: number;
+  kind: ToastKind;
+  message: string;
+  actionLabel?: string;
+  actionHref?: string;
+};
 
 /**
  * Dynamically import QR scanner (client-side only)
@@ -60,6 +69,13 @@ export default function Home() {
   const [isLoggedOut, setIsLoggedOut] = useState(false);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
 
+  // Toast state (minimalist notifications)
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  // Refs
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
   // Dialog states
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
@@ -74,6 +90,55 @@ export default function Home() {
   // QR code state
   const [qrCodeUrl, setQrCodeUrl] = useState("");
 
+  const showToast = useCallback(
+    (next: Omit<ToastState, "id">) => {
+      setToast({ id: Date.now(), ...next });
+    },
+    [setToast]
+  );
+
+  useEffect(() => {
+    if (!toast) return;
+
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 10_000);
+
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    };
+  }, [toast]);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    if (!showUserMenu) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const root = userMenuRef.current;
+      if (!root) return;
+      if (e.target instanceof Node && root.contains(e.target)) return;
+      setShowUserMenu(false);
+    };
+
+    window.addEventListener("pointerdown", onPointerDown, { capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, {
+        capture: true,
+      } as any);
+    };
+  }, [showUserMenu]);
+
+  // Toast when Receive tab opens
+  useEffect(() => {
+    if (!receiveDialogOpen) return;
+    showToast({
+      kind: "info",
+      message: wallet
+        ? "Copy your address"
+        : "Connect your wallet to receive LXUSD.",
+    });
+  }, [receiveDialogOpen, wallet, showToast]);
+
   /**
    * Load cached wallet data from localStorage
    */
@@ -84,6 +149,23 @@ export default function Home() {
         const walletData = JSON.parse(cachedWallet);
         setWallet(walletData);
         setIsLoading(false);
+        // Always refresh balances in the background to avoid stale cached amounts.
+        // Also persists the refreshed wallet back into localStorage.
+        if (walletData?.address) {
+          void (async () => {
+            const balances = await fetchBalances(walletData.address);
+            const next: WalletData = {
+              ...walletData,
+              xrplBalance: balances.xrplBalance,
+              lxusdBalance: balances.lxusdBalance,
+              usdcBalance: balances.usdcBalance,
+              lookBalance: balances.lxusdBalance,
+              lookUsdValue: balances.lxusdBalance,
+            };
+            setWallet(next);
+            localStorage.setItem("lookWalletData", JSON.stringify(next));
+          })();
+        }
         return;
       } catch (error) {
         console.error("Failed to parse cached wallet:", error);
@@ -298,6 +380,11 @@ export default function Home() {
 
     try {
       setIsSending(true);
+      // Close the modal before invoking MetaKeep.
+      // The Radix Dialog overlay can otherwise sit above the MetaKeep consent widget,
+      // making the widget appear "frozen" (buttons not clickable).
+      setSendDialogOpen(false);
+      await new Promise((r) => setTimeout(r, 50));
 
       // Wait for MetaKeep SDK
       if (typeof window.MetaKeep === "undefined") {
@@ -310,16 +397,6 @@ export default function Home() {
           process.env.NEXT_PUBLIC_METAKEEP_APP_ID ||
           "6d8968c6-397b-4ddf-8dd7-a346324900aa",
       });
-
-      // Fetch current nonce from blockchain
-      const nonceResponse = await fetch(
-        `/api/transaction?address=${wallet.address}`
-      );
-      if (!nonceResponse.ok) {
-        throw new Error("Failed to fetch transaction nonce");
-      }
-      const nonceData = await nonceResponse.json();
-      const nonce = nonceData.nonce || "0x0";
 
       // Get ERC-20 transfer transaction data from API
       const transferDataResponse = await fetch("/api/token-transfer", {
@@ -343,19 +420,38 @@ export default function Home() {
 
       const transferData = await transferDataResponse.json();
 
+      // Fetch chainId, nonce, fees and gas estimate from server (prevents chain-id mismatches)
+      const paramsResponse = await fetch("/api/tx-params", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: wallet.address,
+          to: transferData.transactionData.to,
+          data: transferData.transactionData.data,
+        }),
+      });
+
+      if (!paramsResponse.ok) {
+        const errorData = await paramsResponse.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || "Failed to prepare transaction params"
+        );
+      }
+
+      const txParams = await paramsResponse.json();
+
       // Create ERC-20 token transfer transaction for XRPL EVM Testnet
-      // Gas limit for ERC-20 transfers is typically higher (65000)
       const transaction = {
         type: 2,
         from: wallet.address,
         to: transferData.transactionData.to, // LXUSD contract address
         value: transferData.transactionData.value, // "0x0" for ERC-20 transfers
-        nonce: nonce,
+        nonce: txParams.nonceHex,
         data: transferData.transactionData.data, // ERC-20 transfer function call data
-        gas: 65000, // Higher gas limit for ERC-20 transfers
-        maxFeePerGas: 1000000000, // 1 gwei
-        maxPriorityFeePerGas: 999000000,
-        chainId: 1440002, // XRPL EVM Testnet
+        gas: txParams.gas,
+        maxFeePerGas: txParams.maxFeePerGas,
+        maxPriorityFeePerGas: txParams.maxPriorityFeePerGas,
+        chainId: txParams.chainId,
       };
 
       // Sign transaction using MetaKeep SDK
@@ -367,19 +463,36 @@ export default function Home() {
         )}...${recipientAddress.slice(-4)}`
       );
 
-      // Check if transaction was signed successfully
-      if (signedTx.status !== "SUCCESS" || !signedTx.transaction) {
-        throw new Error("Transaction signing failed");
+      // Check if transaction was signed successfully.
+      // MetaKeep's current EVM response shape (per docs) returns:
+      // - signedRawTransaction (RLP encoded, ready for eth_sendRawTransaction)
+      // - transactionHash
+      if (!signedTx || signedTx.status !== "SUCCESS") {
+        const status = (signedTx as any)?.status || "UNKNOWN";
+        if (
+          status === "USER_REQUEST_DENIED" ||
+          status === "USER_CONSENT_DENIED"
+        ) {
+          throw new Error("User denied transaction signing");
+        }
+        throw new Error(`Transaction signing failed (${status})`);
       }
 
-      // Extract signed transaction data
-      // MetaKeep returns the signed transaction in transaction object
-      // The raw signed transaction might be in transaction.rawTransaction or transaction.hash
-      // For eth_sendRawTransaction, we need the serialized signed transaction
-      const signedTransactionData =
-        signedTx.transaction.rawTransaction ||
-        signedTx.transaction.signedTransaction ||
-        signedTx.transaction;
+      const signedAny = signedTx as any;
+      const signedRaw =
+        signedAny.signedRawTransaction ||
+        signedAny.signedTransaction ||
+        signedAny.transaction?.rawTransaction ||
+        signedAny.transaction?.signedTransaction ||
+        signedAny.transaction?.raw;
+
+      if (
+        !signedRaw ||
+        typeof signedRaw !== "string" ||
+        !signedRaw.startsWith("0x")
+      ) {
+        throw new Error("MetaKeep did not return a signed raw transaction");
+      }
 
       // Submit signed transaction to XRPL EVM testnet
       const submitResponse = await fetch("/api/transaction", {
@@ -388,7 +501,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          signedTransaction: signedTransactionData,
+          signedTransaction: signedRaw,
         }),
       });
 
@@ -406,35 +519,42 @@ export default function Home() {
 
       // Store transaction hash for UI display
       setLastTxHash(txHash);
+      showToast({
+        kind: "success",
+        message: "Transaction submitted.",
+        actionLabel: "View",
+        actionHref: `${EXPLORER_TX_BASE}${txHash}`,
+      });
 
-      // Close dialog and reset form
-      setSendDialogOpen(false);
+      // Reset form
       setRecipientAddress("");
       setSendAmount("1.00");
 
       // Refresh wallet balances after successful transaction
       if (wallet.address) {
         const balances = await fetchBalances(wallet.address);
-        setWallet((prev) =>
-          prev
-            ? {
-                ...prev,
-                xrplBalance: balances.xrplBalance,
-                lxusdBalance: balances.lxusdBalance,
-                usdcBalance: balances.usdcBalance,
-                lookBalance: balances.lxusdBalance,
-                lookUsdValue: balances.lxusdBalance,
-              }
-            : null
-        );
+        setWallet((prev) => {
+          if (!prev) return null;
+          const next = {
+            ...prev,
+            xrplBalance: balances.xrplBalance,
+            lxusdBalance: balances.lxusdBalance,
+            usdcBalance: balances.usdcBalance,
+            lookBalance: balances.lxusdBalance,
+            lookUsdValue: balances.lxusdBalance,
+          };
+          localStorage.setItem("lookWalletData", JSON.stringify(next));
+          return next;
+        });
       }
     } catch (error) {
       console.error("Failed to send transaction:", error);
-      alert(
-        `Failed to send transaction: ${
+      showToast({
+        kind: "error",
+        message: `Send failed: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+        }`,
+      });
     } finally {
       setIsSending(false);
     }
@@ -446,7 +566,7 @@ export default function Home() {
   const copyAddress = async () => {
     if (wallet?.address) {
       await navigator.clipboard.writeText(wallet.address);
-      // Could add a toast notification here
+      showToast({ kind: "success", message: "Address copied to clipboard." });
     }
   };
 
@@ -489,18 +609,14 @@ export default function Home() {
 
   return (
     <main className="min-h-screen wallet-background flex items-center justify-center p-4">
-      <div className="w-full max-w-[440px] bg-[#1a1a1a] rounded-3xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-[440px] bg-[#141414] rounded-3xl shadow-[0_24px_80px_rgba(0,0,0,0.75)] overflow-hidden flex flex-col h-[min(860px,calc(100vh-2rem))]">
         {/* Header */}
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center overflow-hidden">
-              <Image
-                src="/lookcoin.png"
-                alt="LXUSD Wallet"
-                width={40}
-                height={40}
-                className="w-full h-full object-cover"
-              />
+            <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center">
+              <span className="text-black font-extrabold text-lg leading-none">
+                L
+              </span>
             </div>
             <h1 className="text-xl font-semibold text-white">LXUSD Wallet</h1>
           </div>
@@ -508,16 +624,16 @@ export default function Home() {
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700 rounded-lg"
+              className="text-gray-300 hover:text-white hover:bg-white/5 border border-white/10 rounded-xl"
               onClick={handleShowReceiveQR}
             >
               <QrCode className="w-5 h-5" />
             </Button>
-            <div className="relative">
+            <div className="relative" ref={userMenuRef}>
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700 rounded-lg"
+                className="text-gray-300 hover:text-white hover:bg-white/5 border border-white/10 rounded-xl"
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 <User className="w-5 h-5" />
@@ -525,10 +641,10 @@ export default function Home() {
 
               {/* User dropdown menu */}
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-[#2a2a2a] rounded-lg shadow-xl border border-gray-700 z-50">
+                <div className="absolute right-0 mt-2 w-64 bg-[#1b1b1b] rounded-xl shadow-xl border border-white/10 z-50 overflow-hidden">
                   {wallet ? (
                     <>
-                      <div className="p-4 border-b border-gray-700">
+                      <div className="p-4 border-b border-white/10">
                         <div className="flex items-center gap-2 text-sm text-gray-300">
                           <Mail className="w-4 h-4" />
                           <span className="truncate">
@@ -538,7 +654,7 @@ export default function Home() {
                       </div>
                       <button
                         onClick={handleLogout}
-                        className="w-full p-3 flex items-center gap-2 text-red-400 hover:bg-gray-800 transition-colors rounded-b-lg"
+                        className="w-full p-3 flex items-center gap-2 text-red-400 hover:bg-white/5 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />
                         <span className="text-sm font-medium">Logout</span>
@@ -547,7 +663,7 @@ export default function Home() {
                   ) : (
                     <button
                       onClick={handleLogin}
-                      className="w-full p-3 flex items-center gap-2 text-[hsl(var(--look-yellow))] hover:bg-gray-800 transition-colors rounded-lg"
+                      className="w-full p-3 flex items-center gap-2 text-[hsl(var(--look-yellow))] hover:bg-white/5 transition-colors"
                     >
                       <LogIn className="w-4 h-4" />
                       <span className="text-sm font-medium">
@@ -561,171 +677,155 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Balance Section */}
-        <div className="p-6 text-center">
-          <p className="text-gray-400 text-sm mb-2">Total Balance</p>
-          <h2 className="text-5xl font-bold text-white mb-3">
-            ${wallet?.lookBalance.toFixed(0) || "0"}
-          </h2>
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-[hsl(var(--look-yellow))] font-semibold">
-              {wallet?.lookBalance.toFixed(3) || "0.000"} LXUSD
-            </span>
-            <span className="text-gray-500">
-              (${wallet?.lookUsdValue.toFixed(2) || "0.00"})
-            </span>
-          </div>
-
-          {/* Transaction Status */}
-          {lastTxHash && (
-            <div className="mt-4 p-3 bg-[#2a2a2a] rounded-lg border border-gray-700">
-              <p className="text-xs text-gray-400 mb-2">Last Transaction</p>
-              <a
-                href={`${EXPLORER_TX_BASE}${lastTxHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[hsl(var(--look-yellow))] hover:underline text-sm font-mono break-all"
-              >
-                {lastTxHash.slice(0, 10)}...{lastTxHash.slice(-8)}
-              </a>
-              <p className="text-xs text-green-400 mt-1">✓ Submitted</p>
-            </div>
-          )}
-        </div>
-
-        {/* Buy Button */}
-        <div className="px-6 mb-4">
-          <Button
-            className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-white font-semibold py-6 rounded-xl text-base"
-            onClick={() => window.open("https://faucet.circle.com/", "_blank")}
-          >
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            BUY $LXUSD
-          </Button>
-        </div>
-
-        {/* Send & Receive Buttons */}
-        <div className="px-6 mb-6 grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            className="bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white py-6 rounded-xl"
-            onClick={() => setSendDialogOpen(true)}
-            disabled={!wallet}
-          >
-            <Send className="w-4 h-4 mr-2" />
-            Send
-          </Button>
-          <Button
-            variant="outline"
-            className="bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white py-6 rounded-xl"
-            onClick={() => setReceiveDialogOpen(true)}
-            disabled={!wallet}
-          >
-            <CirclePlus className="w-4 h-4 mr-2" />
-            Receive
-          </Button>
-        </div>
-
-        {/* Your Assets Section */}
-        <div className="px-6 pb-6">
-          <h3 className="text-white font-semibold mb-4">Your Assets</h3>
-
-          {/* LOOK Token */}
-          <div className="bg-[#2a2a2a] rounded-xl p-4 mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center overflow-hidden">
-                <Image
-                  src="/lookcoin.png"
-                  alt="LXUSD"
-                  width={40}
-                  height={40}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div>
-                <p className="text-white font-semibold">$LXUSD</p>
-                <p className="text-gray-400 text-sm">Attention Token</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-white font-semibold">
-                {wallet?.lookBalance.toFixed(3) || "0.000"}
-              </p>
-              <p className="text-gray-400 text-sm">
-                ${wallet?.lookUsdValue.toFixed(2) || "0.00"}
-              </p>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Balance Section */}
+          <div className="p-6 text-center shrink-0">
+            <p className="text-gray-400 text-sm mb-2">Total Balance</p>
+            <h2 className="text-5xl font-bold text-white mb-3">
+              ${wallet?.lookBalance.toFixed(0) || "0"}
+            </h2>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[hsl(var(--look-yellow))] font-semibold">
+                {wallet?.lookBalance.toFixed(2) || "0.00"} LXUSD
+              </span>
+              <span className="text-gray-500">
+                (${wallet?.lookUsdValue.toFixed(2) || "0.00"})
+              </span>
             </div>
           </div>
 
-          {/* XRPL Token */}
-          <div className="bg-[#2a2a2a] rounded-xl p-4 mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">X</span>
-              </div>
-              <div>
-                <p className="text-white font-semibold">XRPL EVM</p>
-                <p className="text-gray-400 text-sm">Network Token</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-white font-semibold">
-                {wallet?.xrplBalance.toFixed(1) || "0.0"}
-              </p>
-              <p className="text-gray-400 text-sm">
-                {wallet && wallet.xrplBalance > 0
-                  ? `$${(wallet.xrplBalance * 0.5).toFixed(2)}`
-                  : "$0.00"}
-              </p>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Buy Button */}
+          <div className="px-6 mb-4 shrink-0">
             <Button
-              variant="outline"
-              className="bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white py-5 rounded-xl"
+              className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 rounded-2xl text-base"
               onClick={() =>
-                window.open("https://faucet.xrplevm.org/", "_blank")
+                window.open("https://faucet.circle.com/", "_blank")
               }
             >
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Buy XRPL
+              <ShoppingCart className="w-5 h-5 mr-2" />
+              BUY $LXUSD
+            </Button>
+          </div>
+
+          {/* Send & Receive Buttons */}
+          <div className="px-6 mb-5 grid grid-cols-2 gap-3 shrink-0">
+            <Button
+              variant="outline"
+              className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+              onClick={() => setSendDialogOpen(true)}
+              disabled={!wallet}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Send
             </Button>
             <Button
               variant="outline"
-              className="bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white py-5 rounded-xl"
+              className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+              onClick={() => setReceiveDialogOpen(true)}
+              disabled={!wallet}
             >
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                />
-              </svg>
-              Swap XRPL
+              <CirclePlus className="w-4 h-4 mr-2" />
+              Receive
             </Button>
+          </div>
+
+          {/* Your Assets Section */}
+          <div className="px-6 pb-6 flex-1 flex flex-col overflow-hidden">
+            <h3 className="text-white font-semibold mb-4">Your Assets</h3>
+
+            {/* LOOK Token */}
+            <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-3 flex items-center justify-between border border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center">
+                  <span className="text-black font-extrabold text-lg leading-none">
+                    L
+                  </span>
+                </div>
+                <div>
+                  <p className="text-white font-semibold">$LXUSD</p>
+                  <p className="text-gray-400 text-sm">Attention Token</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-white font-semibold">
+                  {wallet?.lookBalance.toFixed(2) || "0.00"}
+                </p>
+                <p className="text-gray-400 text-sm">
+                  ${wallet?.lookUsdValue.toFixed(2) || "0.00"}
+                </p>
+              </div>
+            </div>
+
+            {/* XRPL Token */}
+            <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-4 flex items-center justify-between border border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">X</span>
+                </div>
+                <div>
+                  <p className="text-white font-semibold">XRPL EVM</p>
+                  <p className="text-gray-400 text-sm">Network Token</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-white font-semibold">
+                  {wallet?.xrplBalance.toFixed(1) || "0.0"}
+                </p>
+                <p className="text-gray-400 text-sm">
+                  {wallet && wallet.xrplBalance > 0
+                    ? `$${(wallet.xrplBalance * 0.5).toFixed(2)}`
+                    : "$0.00"}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 mt-auto pt-4">
+              <Button
+                variant="outline"
+                className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+                onClick={() =>
+                  window.open("https://faucet.xrplevm.org/", "_blank")
+                }
+              >
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Buy XRPL
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+              >
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                  />
+                </svg>
+                Swap XRPL
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Send Dialog */}
         <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
-          <DialogContent className="bg-[#1a1a1a] border-gray-800 text-white max-w-[400px]">
+          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[380px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold text-white">
                 Send LXUSD
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
+            <div className="space-y-3 pt-2">
               <Button
                 variant="outline"
-                className="w-full bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white py-6"
+                className="w-full bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
                 onClick={() => setQrScanAddressDialogOpen(true)}
               >
                 <ScanLine className="w-5 h-5 mr-2" />
@@ -739,7 +839,7 @@ export default function Home() {
                   placeholder="Enter wallet address"
                   value={recipientAddress}
                   onChange={(e) => setRecipientAddress(e.target.value)}
-                  className="bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500 h-12"
+                  className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 rounded-xl"
                 />
               </div>
               <div>
@@ -752,11 +852,11 @@ export default function Home() {
                   step="0.01"
                   value={sendAmount}
                   onChange={(e) => setSendAmount(e.target.value)}
-                  className="bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500 h-12 text-lg font-semibold"
+                  className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 text-lg font-semibold rounded-xl"
                 />
               </div>
               <Button
-                className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-white font-semibold py-6 text-base"
+                className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 text-base rounded-2xl"
                 onClick={handleSend}
                 disabled={!recipientAddress || !sendAmount || isSending}
               >
@@ -768,14 +868,14 @@ export default function Home() {
 
         {/* Receive Dialog */}
         <Dialog open={receiveDialogOpen} onOpenChange={setReceiveDialogOpen}>
-          <DialogContent className="bg-[#1a1a1a] border-gray-800 text-white max-w-[340px]">
+          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[360px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-white">
                 Receive LXUSD
               </DialogTitle>
             </DialogHeader>
             {wallet ? (
-              <div className="space-y-4 pt-2">
+              <div className="space-y-3 pt-2">
                 {/* QR Code */}
                 <div className="flex justify-center">
                   <div className="bg-white p-3 rounded-lg">
@@ -798,7 +898,7 @@ export default function Home() {
                   </p>
                   <Button
                     variant="outline"
-                    className="bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white w-full"
+                    className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white w-full rounded-2xl"
                     onClick={copyAddress}
                   >
                     <QrCode className="w-4 h-4 mr-2" />
@@ -812,7 +912,7 @@ export default function Home() {
                   Please connect your wallet to receive tokens
                 </p>
                 <Button
-                  className="bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-white"
+                  className="bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black rounded-2xl"
                   onClick={() => {
                     setReceiveDialogOpen(false);
                     handleLogin();
@@ -828,7 +928,7 @@ export default function Home() {
 
         {/* QR Scanner Dialog for Wallet Address */}
         <Dialog open={qrScanDialogOpen} onOpenChange={setQrScanDialogOpen}>
-          <DialogContent className="bg-[#1a1a1a] border-gray-800 text-white max-w-[340px]">
+          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[360px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-white">
                 Your Wallet QR Code
@@ -858,7 +958,7 @@ export default function Home() {
                   </p>
                   <Button
                     variant="outline"
-                    className="bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white w-full"
+                    className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white w-full rounded-2xl"
                     onClick={copyAddress}
                   >
                     <QrCode className="w-4 h-4 mr-2" />
@@ -872,7 +972,7 @@ export default function Home() {
                   Please connect your wallet to view QR code
                 </p>
                 <Button
-                  className="bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-white"
+                  className="bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black rounded-2xl"
                   onClick={() => {
                     setQrScanDialogOpen(false);
                     handleLogin();
@@ -891,7 +991,7 @@ export default function Home() {
           open={qrScanAddressDialogOpen}
           onOpenChange={setQrScanAddressDialogOpen}
         >
-          <DialogContent className="bg-[#1a1a1a] border-gray-800 text-white max-w-[400px]">
+          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[400px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold text-white">
                 Scan Recipient QR Code
@@ -903,6 +1003,35 @@ export default function Home() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Bottom toast (outside the wallet card) */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-[60] w-[min(520px,calc(100vw-24px))] -translate-x-1/2">
+          <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0f0f0f]/95 px-4 py-3 shadow-[0_16px_60px_rgba(0,0,0,0.65)] backdrop-blur">
+            <div className="min-w-0">
+              <p className="text-sm text-gray-100 truncate">{toast.message}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {toast.actionHref && toast.actionLabel && (
+                <a
+                  href={toast.actionHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-200 hover:text-white underline underline-offset-4 whitespace-nowrap"
+                >
+                  {toast.actionLabel}
+                </a>
+              )}
+              <button
+                onClick={() => setToast(null)}
+                className="text-xs text-gray-400 hover:text-gray-200 whitespace-nowrap"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

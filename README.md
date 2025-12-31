@@ -70,7 +70,7 @@ look-ripple/
 ├── types/
 │   └── metakeep.d.ts        # MetaKeep type definitions
 └── public/
-    └── look-logo.svg        # LXUSD wallet logo
+    └── lxusd-logo.svg       # LXUSD wallet logo
 \`\`\`
 
 ## Features in Detail
