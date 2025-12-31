@@ -1,0 +1,15 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Look brand color circle background -->
+  <circle cx="100" cy="100" r="100" fill="#f6ad27"/>
+  
+  <!-- Left eye -->
+  <ellipse cx="70" cy="85" rx="22" ry="32" fill="white"/>
+  <ellipse cx="70" cy="88" rx="12" ry="18" fill="#2D3748"/>
+  <circle cx="72" cy="82" r="6" fill="white"/>
+  
+  <!-- Right eye -->
+  <ellipse cx="130" cy="85" rx="22" ry="32" fill="white"/>
+  <ellipse cx="130" cy="88" rx="12" ry="18" fill="#2D3748"/>
+  <circle cx="132" cy="82" r="6" fill="white"/>
+</svg>
+
