@@ -4,20 +4,32 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Contract, JsonRpcProvider, formatEther, formatUnits, isAddress } from "ethers";
 
 /**
- * XRPL EVM Testnet RPC endpoint
- * Using official Ripple EVM testnet RPC endpoint for testnet balances
+ * XRPL EVM Testnet RPC endpoint.
+ *
+ * Best practice: prefer a server-side env var, but keep NEXT_PUBLIC fallback
+ * to avoid breaking existing setups.
  */
 const RPC_URL =
+  process.env.XRPL_EVM_TESTNET_RPC_URL ||
   process.env.NEXT_PUBLIC_XRPL_RPC_URL ||
   "https://rpc.testnet.xrplevm.org";
 
 /**
- * USDC contract address on XRPL EVM testnet
+ * LXUSD contract address on XRPL EVM testnet.
+ *
+ * Defaults to the deployed address you provided; can be overridden by env.
  */
-const USDC_CONTRACT_ADDRESS =
-  "0x07865c6E87B9F70255377e024ace6630C1Eaa37F";
+const LXUSD_CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_LXUSD_CONTRACT_ADDRESS ||
+  "0xE3a2798bA79a1Fe34b6ad050c7fC791E4346a6c9";
+
+const ERC20_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+];
 
 /**
  * Handle GET request to fetch balances for a wallet address
@@ -31,62 +43,43 @@ export async function GET(request: NextRequest) {
     const address = searchParams.get("address");
 
     // Validate address parameter
-    if (!address || !address.startsWith("0x")) {
+    if (!address || !isAddress(address)) {
       return NextResponse.json(
         { error: "Invalid wallet address" },
         { status: 400 }
       );
     }
 
-    // Fetch native XRPL balance using eth_getBalance
-    const xrplBalanceResponse = await fetch(RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "eth_getBalance",
-        params: [address, "latest"],
-        id: 1,
-      }),
-    });
+    if (!isAddress(LXUSD_CONTRACT_ADDRESS)) {
+      return NextResponse.json(
+        {
+          error: "LXUSD contract address not configured",
+          message:
+            "Set NEXT_PUBLIC_LXUSD_CONTRACT_ADDRESS to a valid contract address.",
+        },
+        { status: 500 }
+      );
+    }
 
-    // Parse XRPL balance response
-    const xrplBalanceData = await xrplBalanceResponse.json();
-    const xrplBalanceHex = xrplBalanceData.result || "0x0";
-    const xrplBalance = parseInt(xrplBalanceHex, 16) / 1e18; // Convert from wei to XRPL
+    const provider = new JsonRpcProvider(RPC_URL);
+    const token = new Contract(LXUSD_CONTRACT_ADDRESS, ERC20_ABI, provider);
 
-    // Prepare data for USDC balanceOf call
-    // balanceOf function signature: 0x70a08231 + padded address
-    const paddedAddress = address.slice(2).padStart(64, "0");
-    const data = "0x70a08231" + paddedAddress;
+    const [xrplBalanceWei, balanceRaw, decimals] = await Promise.all([
+      provider.getBalance(address),
+      token.balanceOf(address),
+      token.decimals(),
+    ]);
 
-    // Fetch USDC balance using eth_call
-    const usdcBalanceResponse = await fetch(RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "eth_call",
-        params: [
-          {
-            to: USDC_CONTRACT_ADDRESS,
-            data: data,
-          },
-          "latest",
-        ],
-        id: 2,
-      }),
-    });
-
-    // Parse USDC balance response
-    const usdcBalanceData = await usdcBalanceResponse.json();
-    const usdcBalanceHex = usdcBalanceData.result || "0x0";
-    const usdcBalance = parseInt(usdcBalanceHex, 16) / 1e6; // USDC has 6 decimals
+    const xrplBalance = Number.parseFloat(Number(formatEther(xrplBalanceWei)).toFixed(3));
+    const lxusdBalance = Number.parseFloat(
+      Number(formatUnits(balanceRaw, decimals)).toFixed(3)
+    );
 
     // Return formatted balances
     return NextResponse.json({
-      xrplBalance: parseFloat(xrplBalance.toFixed(3)),
-      usdcBalance: parseFloat(usdcBalance.toFixed(3)),
+      xrplBalance,
+      lxusdBalance,
+      usdcBalance: lxusdBalance, // Backward compatibility
     });
   } catch (error) {
     // Log error for debugging

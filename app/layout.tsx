@@ -12,10 +12,10 @@ const inter = Inter({
 });
 
 /**
- * Metadata for the Look Wallet application
+ * Metadata for the LXUSD Wallet application
  */
 export const metadata: Metadata = {
-  title: "Look Wallet",
+  title: "LXUSD Wallet",
   description: "XRPL EVM Wallet - Send and receive tokens seamlessly",
   icons: {
     icon: [

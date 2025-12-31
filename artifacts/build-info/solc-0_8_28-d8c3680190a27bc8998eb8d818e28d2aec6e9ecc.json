@@ -1,0 +1,43 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-d8c3680190a27bc8998eb8d818e28d2aec6e9ecc",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/Lock.sol": "project/contracts/Lock.sol",
+    "contracts/LXUSD.sol": "project/contracts/LXUSD.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Lock.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity ^0.8.28;\n\n// Uncomment this line to use console.log\n// import \"hardhat/console.sol\";\n\ncontract Lock {\n  uint public unlockTime;\n  address payable public owner;\n\n  event Withdrawal(uint amount, uint when);\n\n  constructor(uint _unlockTime) payable {\n    require(\n      block.timestamp < _unlockTime,\n      \"Unlock time should be in the future\"\n    );\n\n    unlockTime = _unlockTime;\n    owner = payable(msg.sender);\n  }\n\n  function withdraw() public {\n    // Uncomment this line, and the import of \"hardhat/console.sol\", to print a log in your terminal\n    // console.log(\"Unlock time is %o and block timestamp is %o\", unlockTime, block.timestamp);\n\n    require(block.timestamp >= unlockTime, \"You can't withdraw yet\");\n    require(msg.sender == owner, \"You aren't the owner\");\n\n    emit Withdrawal(address(this).balance, block.timestamp);\n\n    owner.transfer(address(this).balance);\n  }\n}\n"
+      },
+      "project/contracts/LXUSD.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\n/**\n * @title LXUSD\n * @dev ERC-20 token contract for LXUSD on XRPL EVM Testnet\n * @notice This contract implements a standard ERC-20 token with minting capabilities\n */\ncontract LXUSD {\n    // Token metadata\n    string public name = \"LXUSD\";\n    string public symbol = \"LXUSD\";\n    uint8 public decimals = 18;\n    uint256 public totalSupply;\n\n    // Owner of the contract (can mint tokens)\n    address public owner;\n\n    // Balances mapping\n    mapping(address => uint256) public balanceOf;\n\n    // Allowances mapping\n    mapping(address => mapping(address => uint256)) public allowance;\n\n    // Events\n    event Transfer(address indexed from, address indexed to, uint256 value);\n    event Approval(address indexed owner, address indexed spender, uint256 value);\n    event Mint(address indexed to, uint256 value);\n\n    /**\n     * @dev Constructor sets the contract owner\n     */\n    constructor() {\n        owner = msg.sender;\n        totalSupply = 0;\n    }\n\n    /**\n     * @dev Modifier to restrict functions to owner only\n     */\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Only owner can call this function\");\n        _;\n    }\n\n    /**\n     * @dev Transfer tokens from caller to recipient\n     * @param to Address to transfer tokens to\n     * @param value Amount of tokens to transfer\n     * @return success Boolean indicating if transfer was successful\n     */\n    function transfer(address to, uint256 value) public returns (bool success) {\n        require(balanceOf[msg.sender] >= value, \"Insufficient balance\");\n        require(to != address(0), \"Cannot transfer to zero address\");\n\n        balanceOf[msg.sender] -= value;\n        balanceOf[to] += value;\n\n        emit Transfer(msg.sender, to, value);\n        return true;\n    }\n\n    /**\n     * @dev Transfer tokens from one address to another (requires approval)\n     * @param from Address to transfer tokens from\n     * @param to Address to transfer tokens to\n     * @param value Amount of tokens to transfer\n     * @return success Boolean indicating if transfer was successful\n     */\n    function transferFrom(\n        address from,\n        address to,\n        uint256 value\n    ) public returns (bool success) {\n        require(balanceOf[from] >= value, \"Insufficient balance\");\n        require(allowance[from][msg.sender] >= value, \"Insufficient allowance\");\n        require(to != address(0), \"Cannot transfer to zero address\");\n\n        balanceOf[from] -= value;\n        balanceOf[to] += value;\n        allowance[from][msg.sender] -= value;\n\n        emit Transfer(from, to, value);\n        return true;\n    }\n\n    /**\n     * @dev Approve spender to spend tokens on behalf of owner\n     * @param spender Address allowed to spend tokens\n     * @param value Amount of tokens to approve\n     * @return success Boolean indicating if approval was successful\n     */\n    function approve(\n        address spender,\n        uint256 value\n    ) public returns (bool success) {\n        allowance[msg.sender][spender] = value;\n        emit Approval(msg.sender, spender, value);\n        return true;\n    }\n\n    /**\n     * @dev Mint new tokens to specified address (owner only)\n     * @param to Address to mint tokens to\n     * @param value Amount of tokens to mint\n     */\n    function mint(address to, uint256 value) public onlyOwner {\n        require(to != address(0), \"Cannot mint to zero address\");\n\n        balanceOf[to] += value;\n        totalSupply += value;\n\n        emit Mint(to, value);\n        emit Transfer(address(0), to, value);\n    }\n\n    /**\n     * @dev Get token balance of an address\n     * @param account Address to check balance for\n     * @return balance Token balance of the address\n     */\n    function getBalance(address account) public view returns (uint256 balance) {\n        return balanceOf[account];\n    }\n}\n\n"
+      }
+    }
+  }
+}

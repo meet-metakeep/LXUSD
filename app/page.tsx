@@ -25,6 +25,10 @@ import { Input } from "@/components/ui/input";
 import QRCode from "qrcode";
 import dynamic from "next/dynamic";
 
+const EXPLORER_TX_BASE =
+  process.env.NEXT_PUBLIC_EXPLORER_TX_BASE ||
+  "https://explorer.testnet.xrplevm.org/tx/";
+
 /**
  * Dynamically import QR scanner (client-side only)
  */
@@ -38,8 +42,9 @@ const QrScanner = dynamic(() => import("@/components/QrScanner"), {
 interface WalletData {
   address: string;
   email?: string; // Email is optional as MetaKeep prompts user during first connection
-  lookBalance: number;
-  usdcBalance: number;
+  lookBalance: number; // LXUSD balance
+  lxusdBalance: number; // LXUSD token balance
+  usdcBalance: number; // Backward compatibility
   xrplBalance: number;
   lookUsdValue: number;
 }
@@ -53,6 +58,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
 
   // Dialog states
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
@@ -119,7 +125,8 @@ export default function Home() {
       const balanceData = await response.json();
       return {
         xrplBalance: balanceData.xrplBalance || 0,
-        usdcBalance: balanceData.usdcBalance || 0,
+        lxusdBalance: balanceData.lxusdBalance || balanceData.usdcBalance || 0,
+        usdcBalance: balanceData.usdcBalance || balanceData.lxusdBalance || 0,
       };
     } catch (error) {
       // Log error for debugging
@@ -244,10 +251,11 @@ export default function Home() {
         const walletData: WalletData = {
           address,
           email: userEmail, // Store email if found, otherwise undefined
-          lookBalance: balances.usdcBalance, // Display USDC as LOOK
-          usdcBalance: balances.usdcBalance,
+          lxusdBalance: balances.lxusdBalance, // LXUSD token balance
+          lookBalance: balances.lxusdBalance, // Display LXUSD
+          usdcBalance: balances.usdcBalance, // Backward compatibility
           xrplBalance: balances.xrplBalance,
-          lookUsdValue: balances.usdcBalance, // 1 USDC = 1 USD
+          lookUsdValue: balances.lxusdBalance, // 1 LXUSD = 1 USD
         };
 
         setWallet(walletData);
@@ -313,21 +321,38 @@ export default function Home() {
       const nonceData = await nonceResponse.json();
       const nonce = nonceData.nonce || "0x0";
 
-      // Convert amount to smallest unit (USDC has 6 decimals, not 18)
-      // Multiply by 1e6 for USDC decimals
-      const amountInSmallestUnit = BigInt(
-        Math.floor(parseFloat(sendAmount) * 1e6)
-      ).toString(16);
+      // Get ERC-20 transfer transaction data from API
+      const transferDataResponse = await fetch("/api/token-transfer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: wallet.address,
+          to: recipientAddress,
+          amount: sendAmount,
+        }),
+      });
 
-      // Create transaction object for XRPL EVM Testnet
+      if (!transferDataResponse.ok) {
+        const errorData = await transferDataResponse.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || "Failed to create token transfer transaction"
+        );
+      }
+
+      const transferData = await transferDataResponse.json();
+
+      // Create ERC-20 token transfer transaction for XRPL EVM Testnet
+      // Gas limit for ERC-20 transfers is typically higher (65000)
       const transaction = {
         type: 2,
         from: wallet.address,
-        to: recipientAddress,
-        value: `0x${amountInSmallestUnit}`,
+        to: transferData.transactionData.to, // LXUSD contract address
+        value: transferData.transactionData.value, // "0x0" for ERC-20 transfers
         nonce: nonce,
-        data: "0x",
-        gas: 21000,
+        data: transferData.transactionData.data, // ERC-20 transfer function call data
+        gas: 65000, // Higher gas limit for ERC-20 transfers
         maxFeePerGas: 1000000000, // 1 gwei
         maxPriorityFeePerGas: 999000000,
         chainId: 1440002, // XRPL EVM Testnet
@@ -336,7 +361,7 @@ export default function Home() {
       // Sign transaction using MetaKeep SDK
       const signedTx = await sdk.signTransaction(
         transaction,
-        `Send ${sendAmount} LOOK to ${recipientAddress.slice(
+        `Send ${sendAmount} LXUSD to ${recipientAddress.slice(
           0,
           6
         )}...${recipientAddress.slice(-4)}`
@@ -379,13 +404,8 @@ export default function Home() {
 
       console.log("Transaction submitted successfully:", txHash);
 
-      // Show success message with transaction hash
-      alert(
-        `Transaction sent successfully!\nTransaction Hash: ${txHash.slice(
-          0,
-          10
-        )}...${txHash.slice(-8)}`
-      );
+      // Store transaction hash for UI display
+      setLastTxHash(txHash);
 
       // Close dialog and reset form
       setSendDialogOpen(false);
@@ -400,9 +420,10 @@ export default function Home() {
             ? {
                 ...prev,
                 xrplBalance: balances.xrplBalance,
+                lxusdBalance: balances.lxusdBalance,
                 usdcBalance: balances.usdcBalance,
-                lookBalance: balances.usdcBalance,
-                lookUsdValue: balances.usdcBalance,
+                lookBalance: balances.lxusdBalance,
+                lookUsdValue: balances.lxusdBalance,
               }
             : null
         );
@@ -475,13 +496,13 @@ export default function Home() {
             <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center overflow-hidden">
               <Image
                 src="/lookcoin.png"
-                alt="Look Wallet"
+                alt="LXUSD Wallet"
                 width={40}
                 height={40}
                 className="w-full h-full object-cover"
               />
             </div>
-            <h1 className="text-xl font-semibold text-white">Look Wallet</h1>
+            <h1 className="text-xl font-semibold text-white">LXUSD Wallet</h1>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -548,12 +569,28 @@ export default function Home() {
           </h2>
           <div className="flex items-center justify-center gap-2">
             <span className="text-[hsl(var(--look-yellow))] font-semibold">
-              {wallet?.lookBalance.toFixed(3) || "0.000"} LOOK
+              {wallet?.lookBalance.toFixed(3) || "0.000"} LXUSD
             </span>
             <span className="text-gray-500">
               (${wallet?.lookUsdValue.toFixed(2) || "0.00"})
             </span>
           </div>
+
+          {/* Transaction Status */}
+          {lastTxHash && (
+            <div className="mt-4 p-3 bg-[#2a2a2a] rounded-lg border border-gray-700">
+              <p className="text-xs text-gray-400 mb-2">Last Transaction</p>
+              <a
+                href={`${EXPLORER_TX_BASE}${lastTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[hsl(var(--look-yellow))] hover:underline text-sm font-mono break-all"
+              >
+                {lastTxHash.slice(0, 10)}...{lastTxHash.slice(-8)}
+              </a>
+              <p className="text-xs text-green-400 mt-1">✓ Submitted</p>
+            </div>
+          )}
         </div>
 
         {/* Buy Button */}
@@ -563,7 +600,7 @@ export default function Home() {
             onClick={() => window.open("https://faucet.circle.com/", "_blank")}
           >
             <ShoppingCart className="w-5 h-5 mr-2" />
-            BUY $LOOK
+            BUY $LXUSD
           </Button>
         </div>
 
@@ -599,14 +636,14 @@ export default function Home() {
               <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center overflow-hidden">
                 <Image
                   src="/lookcoin.png"
-                  alt="LOOK"
+                  alt="LXUSD"
                   width={40}
                   height={40}
                   className="w-full h-full object-cover"
                 />
               </div>
               <div>
-                <p className="text-white font-semibold">$LOOK</p>
+                <p className="text-white font-semibold">$LXUSD</p>
                 <p className="text-gray-400 text-sm">Attention Token</p>
               </div>
             </div>
@@ -682,7 +719,7 @@ export default function Home() {
           <DialogContent className="bg-[#1a1a1a] border-gray-800 text-white max-w-[400px]">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold text-white">
-                Send LOOK
+                Send LXUSD
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
@@ -707,7 +744,7 @@ export default function Home() {
               </div>
               <div>
                 <label className="text-sm text-gray-400 block mb-2">
-                  Amount (LOOK)
+                  Amount (LXUSD)
                 </label>
                 <Input
                   placeholder="1.00"
@@ -723,7 +760,7 @@ export default function Home() {
                 onClick={handleSend}
                 disabled={!recipientAddress || !sendAmount || isSending}
               >
-                {isSending ? "Sending..." : "Send LOOK"}
+                {isSending ? "Sending..." : "Send LXUSD"}
               </Button>
             </div>
           </DialogContent>
@@ -734,7 +771,7 @@ export default function Home() {
           <DialogContent className="bg-[#1a1a1a] border-gray-800 text-white max-w-[340px]">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-white">
-                Receive LOOK
+                Receive LXUSD
               </DialogTitle>
             </DialogHeader>
             {wallet ? (

@@ -1,12 +1,12 @@
-# Look Wallet - XRPL EVM Network
+# LXUSD Wallet - XRPL EVM Network
 
-A modern, mobile-first crypto wallet interface built for the XRPL EVM testnet. This wallet allows users to send and receive LOOK tokens (backed by USDC on testnet) with a beautiful, pixel-perfect UI.
+A modern, mobile-first crypto wallet interface built for the XRPL EVM testnet. This wallet allows users to send and receive LXUSD tokens (backed by USDC on testnet) with a beautiful, pixel-perfect UI.
 
 ## Features
 
 - 🔐 **MetaKeep Integration**: Secure wallet management using MetaKeep SDK
-- 💰 **Token Management**: View and manage LOOK and XRPL EVM tokens
-- 📤 **Send Tokens**: Send LOOK tokens to any wallet address
+- 💰 **Token Management**: View and manage LXUSD and XRPL EVM tokens
+- 📤 **Send Tokens**: Send LXUSD tokens to any wallet address
 - 📥 **Receive Tokens**: Generate QR codes for receiving tokens
 - 🎨 **Modern UI**: Built with Next.js, Tailwind CSS, and shadcn components
 - 📱 **Mobile-First**: Optimized for mobile viewing and interactions
@@ -41,7 +41,7 @@ npm install
 \`\`\`env
 NEXT_PUBLIC_METAKEEP_APP_ID=d29d6f56-0dd5-44ae-a083-736cc866b212
 NEXT_PUBLIC_XRPL_CHAIN_ID=1440002
-NEXT_PUBLIC_XRPL_RPC_URL=https://rpc-evm-sidechain.xrpl.org
+NEXT_PUBLIC_XRPL_RPC_URL=https://rpc.testnet.xrplevm.org
 \`\`\`
 
 3. Run the development server:
@@ -70,7 +70,7 @@ look-ripple/
 ├── types/
 │   └── metakeep.d.ts        # MetaKeep type definitions
 └── public/
-    └── look-logo.svg        # Look wallet logo
+    └── look-logo.svg        # LXUSD wallet logo
 \`\`\`
 
 ## Features in Detail
@@ -83,7 +83,7 @@ look-ripple/
 - QR code scanner support
 - Manual address input
 - Amount validation
-- Uses USDC on testnet (displayed as LOOK)
+- Uses USDC on testnet (displayed as LXUSD)
 
 ### Receive Tokens
 - QR code generation for wallet address
@@ -93,7 +93,7 @@ look-ripple/
 ### Token Display
 - Real-time balance updates
 - USD value conversion
-- Multiple token support (LOOK and XRPL)
+- Multiple token support (LXUSD and XRPL)
 
 ## Environment Variables
 
@@ -111,8 +111,8 @@ look-ripple/
 
 ## Development Notes
 
-- LOOK tokens are mapped 1:1 with USDC on testnet
-- All values displayed in the UI use the LOOK branding
+- LXUSD tokens are mapped 1:1 with USDC on testnet
+- All values displayed in the UI use the LXUSD branding
 - The wallet uses MetaKeep's EVM address for XRPL EVM compatibility
 
 ## License
