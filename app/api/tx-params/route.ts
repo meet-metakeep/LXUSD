@@ -45,18 +45,17 @@ export async function POST(request: NextRequest) {
         from,
         to,
         data,
-        value: 0n,
       }),
     ]);
 
     // Add a small buffer to avoid out-of-gas due to minor estimation variance.
-    const gasBuffered = (gasEstimate * 12n) / 10n; // +20%
+    const gasBuffered = (gasEstimate * BigInt(12)) / BigInt(10); // +20%
     const gas = Number(gasBuffered);
 
     // Fee data can be null on some RPCs; fallback to gasPrice when necessary.
-    const gasPrice = feeData.gasPrice ?? 1_000_000_000n; // 1 gwei fallback
+    const gasPrice = feeData.gasPrice ?? BigInt(1_000_000_000); // 1 gwei fallback
     const maxPriorityFeePerGas =
-      feeData.maxPriorityFeePerGas ?? (gasPrice / 2n);
+      feeData.maxPriorityFeePerGas ?? (gasPrice / BigInt(2));
     const maxFeePerGas = feeData.maxFeePerGas ?? gasPrice;
 
     const chainId = Number(network.chainId);
