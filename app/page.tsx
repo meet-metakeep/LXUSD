@@ -609,7 +609,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen wallet-background flex items-center justify-center p-4">
-      <div className="w-full max-w-[440px] bg-[#141414] rounded-3xl shadow-[0_24px_80px_rgba(0,0,0,0.75)] overflow-hidden flex flex-col h-[min(860px,calc(100vh-2rem))]">
+      <div className="w-full max-w-[440px] bg-[#141414] rounded-3xl shadow-[0_24px_80px_rgba(0,0,0,0.75)] overflow-hidden">
         {/* Header */}
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -677,140 +677,136 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Balance Section */}
-          <div className="p-6 text-center shrink-0">
-            <p className="text-gray-400 text-sm mb-2">Total Balance</p>
-            <h2 className="text-5xl font-bold text-white mb-3">
-              ${wallet?.lookBalance.toFixed(0) || "0"}
-            </h2>
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-[hsl(var(--look-yellow))] font-semibold">
-                {wallet?.lookBalance.toFixed(2) || "0.00"} LXUSD
-              </span>
-              <span className="text-gray-500">
-                (${wallet?.lookUsdValue.toFixed(2) || "0.00"})
-              </span>
+        {/* Balance Section */}
+        <div className="p-6 text-center">
+          <p className="text-gray-400 text-sm mb-2">Total Balance</p>
+          <h2 className="text-5xl font-bold text-white mb-3">
+            ${wallet?.lookBalance.toFixed(0) || "0"}
+          </h2>
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-[hsl(var(--look-yellow))] font-semibold">
+              {wallet?.lookBalance.toFixed(2) || "0.00"} LXUSD
+            </span>
+            <span className="text-gray-500">
+              (${wallet?.lookUsdValue.toFixed(2) || "0.00"})
+            </span>
+          </div>
+        </div>
+
+        {/* Buy Button */}
+        <div className="px-6 mb-4">
+          <Button
+            className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 rounded-2xl text-base"
+            onClick={() => window.open("https://faucet.circle.com/", "_blank")}
+          >
+            <ShoppingCart className="w-5 h-5 mr-2" />
+            BUY $LXUSD
+          </Button>
+        </div>
+
+        {/* Send & Receive Buttons */}
+        <div className="px-6 mb-6 grid grid-cols-2 gap-3">
+          <Button
+            variant="outline"
+            className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+            onClick={() => setSendDialogOpen(true)}
+            disabled={!wallet}
+          >
+            <Send className="w-4 h-4 mr-2" />
+            Send
+          </Button>
+          <Button
+            variant="outline"
+            className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+            onClick={() => setReceiveDialogOpen(true)}
+            disabled={!wallet}
+          >
+            <CirclePlus className="w-4 h-4 mr-2" />
+            Receive
+          </Button>
+        </div>
+
+        {/* Your Assets Section */}
+        <div className="px-6 pb-6">
+          <h3 className="text-white font-semibold mb-4">Your Assets</h3>
+
+          {/* LOOK Token */}
+          <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-3 flex items-center justify-between border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center">
+                <span className="text-black font-extrabold text-lg leading-none">
+                  L
+                </span>
+              </div>
+              <div>
+                <p className="text-white font-semibold">$LXUSD</p>
+                <p className="text-gray-400 text-sm">Attention Token</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-white font-semibold">
+                {wallet?.lookBalance.toFixed(2) || "0.00"}
+              </p>
+              <p className="text-gray-400 text-sm">
+                ${wallet?.lookUsdValue.toFixed(2) || "0.00"}
+              </p>
             </div>
           </div>
 
-          {/* Buy Button */}
-          <div className="px-6 mb-4 shrink-0">
+          {/* XRPL Token */}
+          <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-4 flex items-center justify-between border border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">X</span>
+              </div>
+              <div>
+                <p className="text-white font-semibold">XRPL EVM</p>
+                <p className="text-gray-400 text-sm">Network Token</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-white font-semibold">
+                {wallet?.xrplBalance.toFixed(1) || "0.0"}
+              </p>
+              <p className="text-gray-400 text-sm">
+                {wallet && wallet.xrplBalance > 0
+                  ? `$${(wallet.xrplBalance * 0.5).toFixed(2)}`
+                  : "$0.00"}
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-3">
             <Button
-              className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 rounded-2xl text-base"
+              variant="outline"
+              className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
               onClick={() =>
-                window.open("https://faucet.circle.com/", "_blank")
+                window.open("https://faucet.xrplevm.org/", "_blank")
               }
             >
-              <ShoppingCart className="w-5 h-5 mr-2" />
-              BUY $LXUSD
-            </Button>
-          </div>
-
-          {/* Send & Receive Buttons */}
-          <div className="px-6 mb-5 grid grid-cols-2 gap-3 shrink-0">
-            <Button
-              variant="outline"
-              className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
-              onClick={() => setSendDialogOpen(true)}
-              disabled={!wallet}
-            >
-              <Send className="w-4 h-4 mr-2" />
-              Send
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Buy XRPL
             </Button>
             <Button
               variant="outline"
               className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
-              onClick={() => setReceiveDialogOpen(true)}
-              disabled={!wallet}
             >
-              <CirclePlus className="w-4 h-4 mr-2" />
-              Receive
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                />
+              </svg>
+              Swap XRPL
             </Button>
-          </div>
-
-          {/* Your Assets Section */}
-          <div className="px-6 pb-6 flex-1 flex flex-col overflow-hidden">
-            <h3 className="text-white font-semibold mb-4">Your Assets</h3>
-
-            {/* LOOK Token */}
-            <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-3 flex items-center justify-between border border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center">
-                  <span className="text-black font-extrabold text-lg leading-none">
-                    L
-                  </span>
-                </div>
-                <div>
-                  <p className="text-white font-semibold">$LXUSD</p>
-                  <p className="text-gray-400 text-sm">Attention Token</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-white font-semibold">
-                  {wallet?.lookBalance.toFixed(2) || "0.00"}
-                </p>
-                <p className="text-gray-400 text-sm">
-                  ${wallet?.lookUsdValue.toFixed(2) || "0.00"}
-                </p>
-              </div>
-            </div>
-
-            {/* XRPL Token */}
-            <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-4 flex items-center justify-between border border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">X</span>
-                </div>
-                <div>
-                  <p className="text-white font-semibold">XRPL EVM</p>
-                  <p className="text-gray-400 text-sm">Network Token</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-white font-semibold">
-                  {wallet?.xrplBalance.toFixed(1) || "0.0"}
-                </p>
-                <p className="text-gray-400 text-sm">
-                  {wallet && wallet.xrplBalance > 0
-                    ? `$${(wallet.xrplBalance * 0.5).toFixed(2)}`
-                    : "$0.00"}
-                </p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 mt-auto pt-4">
-              <Button
-                variant="outline"
-                className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
-                onClick={() =>
-                  window.open("https://faucet.xrplevm.org/", "_blank")
-                }
-              >
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Buy XRPL
-              </Button>
-              <Button
-                variant="outline"
-                className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-                Swap XRPL
-              </Button>
-            </div>
           </div>
         </div>
 
