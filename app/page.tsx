@@ -809,7 +809,7 @@ export default function Home() {
               if (wallet && wallet.lookBalance <= 0) {
                 showToast({
                   kind: "error",
-                  message: "You need LXUSD to send. Buy some first!",
+                  message: "Buy $LXUSD to send",
                   actionLabel: "Buy LXUSD",
                   actionHref: "https://lxusd-faucet.vercel.app/",
                 });
