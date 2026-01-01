@@ -1,19 +1,22 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-// Vercel/Node ESM requires the explicit ".js" subpath for these exports.
-import nextVitals from "eslint-config-next/core-web-vitals.js";
-import nextTs from "eslint-config-next/typescript.js";
+import { globalIgnores } from "eslint/config";
+import { FlatCompat } from "@eslint/eslintrc";
+import { fileURLToPath } from "url";
+import path from "path";
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Use FlatCompat to safely consume legacy shareable configs like next/core-web-vitals
+// under ESLint v9 flat config.
+const compat = new FlatCompat({ baseDirectory: __dirname });
+
+export default [
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
   ]),
-]);
-
-export default eslintConfig;
+];

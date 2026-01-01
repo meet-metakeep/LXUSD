@@ -4,15 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Send,
-  CircleDollarSign,
   ShoppingCart,
   QrCode,
   User,
-  ScanLine,
   LogOut,
   Mail,
   LogIn,
   CirclePlus,
+  ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +23,13 @@ import {
 import { Input } from "@/components/ui/input";
 import QRCode from "qrcode";
 import dynamic from "next/dynamic";
+
+/**
+ * Dynamically import QR scanner (client-side only)
+ */
+const QrScanner = dynamic(() => import("@/components/QrScanner"), {
+  ssr: false,
+});
 
 const EXPLORER_TX_BASE =
   process.env.NEXT_PUBLIC_EXPLORER_TX_BASE ||
@@ -38,12 +44,29 @@ type ToastState = {
   actionHref?: string;
 };
 
-/**
- * Dynamically import QR scanner (client-side only)
- */
-const QrScanner = dynamic(() => import("@/components/QrScanner"), {
-  ssr: false,
-});
+type MetaKeepGetWalletResponse = {
+  status: string;
+  wallet: { ethAddress: string };
+  user?: { email?: string };
+  email?: string;
+};
+
+type MetaKeepSdkLike = {
+  user?: { email?: string };
+  config?: { user?: { email?: string } };
+};
+
+type MetaKeepSignTxResponse = {
+  status: string;
+  signedRawTransaction?: string;
+  signedTransaction?: string;
+  transactionHash?: string;
+  transaction?: {
+    rawTransaction?: string;
+    signedTransaction?: string;
+    raw?: string;
+  };
+};
 
 /**
  * Wallet data interface
@@ -64,10 +87,8 @@ interface WalletData {
 export default function Home() {
   // Wallet state
   const [wallet, setWallet] = useState<WalletData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
-  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
 
   // Toast state (minimalist notifications)
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -90,18 +111,15 @@ export default function Home() {
   // QR code state
   const [qrCodeUrl, setQrCodeUrl] = useState("");
 
-  const showToast = useCallback(
-    (next: Omit<ToastState, "id">) => {
-      setToast({ id: Date.now(), ...next });
-    },
-    [setToast]
-  );
+  const showToast = useCallback((next: Omit<ToastState, "id">) => {
+    setToast({ id: Date.now(), ...next });
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
 
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = window.setTimeout(() => setToast(null), 10_000);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 3_000);
 
     return () => {
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
@@ -120,11 +138,9 @@ export default function Home() {
       setShowUserMenu(false);
     };
 
-    window.addEventListener("pointerdown", onPointerDown, { capture: true });
+    window.addEventListener("pointerdown", onPointerDown, true);
     return () => {
-      window.removeEventListener("pointerdown", onPointerDown, {
-        capture: true,
-      } as any);
+      window.removeEventListener("pointerdown", onPointerDown, true);
     };
   }, [showUserMenu]);
 
@@ -148,7 +164,6 @@ export default function Home() {
       try {
         const walletData = JSON.parse(cachedWallet);
         setWallet(walletData);
-        setIsLoading(false);
         // Always refresh balances in the background to avoid stale cached amounts.
         // Also persists the refreshed wallet back into localStorage.
         if (walletData?.address) {
@@ -175,9 +190,8 @@ export default function Home() {
     // If no cache or logged out, initialize wallet
     if (!isLoggedOut) {
       initWallet();
-    } else {
-      setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedOut]);
 
   /**
@@ -259,22 +273,20 @@ export default function Home() {
         let userEmail: string | undefined;
 
         // Check if response has user information in various possible locations
-        const responseAny = response as any;
-        if (responseAny.user?.email) {
-          userEmail = responseAny.user.email;
-        } else if (responseAny.email) {
-          userEmail = responseAny.email;
-        } else if (responseAny.wallet?.user?.email) {
-          userEmail = responseAny.wallet.user.email;
+        const responseSafe = response as unknown as MetaKeepGetWalletResponse;
+        if (responseSafe.user?.email) {
+          userEmail = responseSafe.user.email;
+        } else if (responseSafe.email) {
+          userEmail = responseSafe.email;
         }
 
         // Try to get from SDK instance if available
         if (!userEmail) {
-          const sdkAny = sdk as any;
-          if (sdkAny.user?.email) {
-            userEmail = sdkAny.user.email;
-          } else if (sdkAny.config?.user?.email) {
-            userEmail = sdkAny.config.user.email;
+          const sdkSafe = sdk as unknown as MetaKeepSdkLike;
+          if (sdkSafe.user?.email) {
+            userEmail = sdkSafe.user.email;
+          } else if (sdkSafe.config?.user?.email) {
+            userEmail = sdkSafe.config.user.email;
           }
         }
 
@@ -301,11 +313,11 @@ export default function Home() {
                     break;
                   }
                 }
-              } catch (e) {
+              } catch {
                 // Continue checking other keys
               }
             }
-          } catch (e) {
+          } catch {
             // Ignore errors when checking MetaKeep storage
           }
         }
@@ -324,7 +336,7 @@ export default function Home() {
               ) {
                 userEmail = parsed.email;
               }
-            } catch (e) {
+            } catch {
               // Ignore parse errors
             }
           }
@@ -343,14 +355,11 @@ export default function Home() {
         setWallet(walletData);
         // Cache wallet data
         localStorage.setItem("lookWalletData", JSON.stringify(walletData));
-        setIsLoading(false);
       } else {
         console.error("MetaKeep wallet connection failed");
-        setIsLoading(false);
       }
     } catch (error) {
       console.error("Failed to initialize wallet:", error);
-      setIsLoading(false);
     }
   };
 
@@ -358,7 +367,7 @@ export default function Home() {
    * Generate QR code for wallet address
    */
   useEffect(() => {
-    if (wallet?.address && receiveDialogOpen) {
+    if (wallet?.address && (receiveDialogOpen || qrScanDialogOpen)) {
       QRCode.toDataURL(wallet.address, {
         width: 300,
         margin: 2,
@@ -370,7 +379,7 @@ export default function Home() {
         .then(setQrCodeUrl)
         .catch(console.error);
     }
-  }, [wallet?.address, receiveDialogOpen]);
+  }, [wallet?.address, receiveDialogOpen, qrScanDialogOpen]);
 
   /**
    * Handle send LOOK tokens with MetaKeep transaction signing
@@ -467,8 +476,9 @@ export default function Home() {
       // MetaKeep's current EVM response shape (per docs) returns:
       // - signedRawTransaction (RLP encoded, ready for eth_sendRawTransaction)
       // - transactionHash
-      if (!signedTx || signedTx.status !== "SUCCESS") {
-        const status = (signedTx as any)?.status || "UNKNOWN";
+      const signed = signedTx as unknown as MetaKeepSignTxResponse;
+      if (!signed || signed.status !== "SUCCESS") {
+        const status = signed?.status || "UNKNOWN";
         if (
           status === "USER_REQUEST_DENIED" ||
           status === "USER_CONSENT_DENIED"
@@ -478,13 +488,12 @@ export default function Home() {
         throw new Error(`Transaction signing failed (${status})`);
       }
 
-      const signedAny = signedTx as any;
       const signedRaw =
-        signedAny.signedRawTransaction ||
-        signedAny.signedTransaction ||
-        signedAny.transaction?.rawTransaction ||
-        signedAny.transaction?.signedTransaction ||
-        signedAny.transaction?.raw;
+        signed.signedRawTransaction ||
+        signed.signedTransaction ||
+        signed.transaction?.rawTransaction ||
+        signed.transaction?.signedTransaction ||
+        signed.transaction?.raw;
 
       if (
         !signedRaw ||
@@ -515,10 +524,6 @@ export default function Home() {
       const submitData = await submitResponse.json();
       const txHash = submitData.txHash;
 
-      console.log("Transaction submitted successfully:", txHash);
-
-      // Store transaction hash for UI display
-      setLastTxHash(txHash);
       showToast({
         kind: "success",
         message: "Transaction submitted.",
@@ -586,7 +591,6 @@ export default function Home() {
   const handleLogin = () => {
     setIsLoggedOut(false);
     setShowUserMenu(false);
-    setIsLoading(true);
     initWallet();
   };
 
@@ -697,7 +701,9 @@ export default function Home() {
         <div className="px-6 mb-4">
           <Button
             className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 rounded-2xl text-base"
-            onClick={() => window.open("https://faucet.circle.com/", "_blank")}
+            onClick={() =>
+              window.open("https://lxusd-faucet.vercel.app/", "_blank")
+            }
           >
             <ShoppingCart className="w-5 h-5 mr-2" />
             BUY $LXUSD
@@ -791,6 +797,12 @@ export default function Home() {
             <Button
               variant="outline"
               className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+              onClick={() => {
+                showToast({
+                  kind: "info",
+                  message: "Coming Soon",
+                });
+              }}
             >
               <svg
                 className="w-4 h-4 mr-2"

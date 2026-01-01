@@ -10,22 +10,12 @@ import { cn } from "@/lib/utils";
 const Dialog = DialogPrimitive.Root;
 
 /**
- * Dialog trigger component
- */
-const DialogTrigger = DialogPrimitive.Trigger;
-
-/**
- * Dialog portal component
+ * Dialog portal component (used internally by DialogContent)
  */
 const DialogPortal = DialogPrimitive.Portal;
 
 /**
- * Dialog close component
- */
-const DialogClose = DialogPrimitive.Close;
-
-/**
- * Dialog overlay component with animation
+ * Dialog overlay component with animation (used internally by DialogContent)
  */
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
@@ -87,23 +77,6 @@ const DialogHeader = ({
 DialogHeader.displayName = "DialogHeader";
 
 /**
- * Dialog footer component
- */
-const DialogFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-      className
-    )}
-    {...props}
-  />
-);
-DialogFooter.displayName = "DialogFooter";
-
-/**
  * Dialog title component
  */
 const DialogTitle = React.forwardRef<
@@ -121,32 +94,12 @@ const DialogTitle = React.forwardRef<
 ));
 DialogTitle.displayName = DialogPrimitive.Title.displayName;
 
-/**
- * Dialog description component
- */
-const DialogDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-));
-DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
   Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogClose,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
-  DialogFooter,
   DialogTitle,
-  DialogDescription,
 };
 
 

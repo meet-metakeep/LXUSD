@@ -6,20 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * XRPL EVM Testnet RPC endpoint
- */
-const RPC_URL =
-  process.env.NEXT_PUBLIC_XRPL_RPC_URL ||
-  "https://rpc.testnet.xrplevm.org";
-
-/**
  * Handle POST request to deploy contract and mint tokens
  * This is a simplified approach - in production, use Hardhat/Foundry for compilation
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    const body = await request.json();
-    const { action, contractAddress, recipientAddress, amount } = body;
 
     // For now, return instructions since we need compiled bytecode
     // In production, you would:
@@ -48,4 +39,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
 

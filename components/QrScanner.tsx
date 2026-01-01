@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
+import jsQR from "jsqr";
 
 /**
  * QR Scanner props interface
@@ -13,105 +14,138 @@ interface QrScannerProps {
 /**
  * QR Code Scanner component using device camera
  * Works on both mobile and desktop devices
+ * Uses BarcodeDetector API when available (Chrome/Edge on Android)
+ * Falls back to jsQR for iOS Safari/Chrome and other browsers
  */
 export default function QrScanner({ onScan }: QrScannerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [scanning, setScanning] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const scanLoopRef = useRef<number | undefined>(undefined);
 
   /**
-   * Start camera and begin scanning
+   * Stops QR code scanning
    */
-  const startScanning = async () => {
+  const stopScan = useCallback(() => {
+    setIsScanning(false);
+    if (scanLoopRef.current) {
+      cancelAnimationFrame(scanLoopRef.current);
+      scanLoopRef.current = undefined;
+    }
+    if (videoRef.current?.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  /**
+   * Starts QR code scanning for wallet address
+   * Uses BarcodeDetector on supported browsers, falls back to jsQR for iOS
+   */
+  const startScan = useCallback(async () => {
     try {
       setError(null);
-      setScanning(true);
-
-      // Request camera access
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }, // Use back camera on mobile
+      setIsScanning(true);
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
       });
-
-      setStream(mediaStream);
-
+      
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
 
-      // Start scanning loop
-      scanQRCode();
-    } catch (err) {
-      console.error("Camera error:", err);
+      // Try to use BarcodeDetector if available (Chrome, Edge on Android)
+      if ("BarcodeDetector" in window) {
+        const detector = new (window as any).BarcodeDetector({
+          formats: ["qr_code"],
+        });
+        const scanFrame = async () => {
+          if (!videoRef.current) return;
+          try {
+            const codes = await detector.detect(videoRef.current);
+            if (codes.length > 0) {
+              const raw = codes[0].rawValue;
+              stopScan();
+              onScan(raw);
+              return;
+            }
+          } catch (err) {
+            console.error("BarcodeDetector error:", err);
+          }
+          // Check if still scanning before continuing
+          if (videoRef.current.srcObject) {
+            scanLoopRef.current = requestAnimationFrame(scanFrame);
+          }
+        };
+        scanLoopRef.current = requestAnimationFrame(scanFrame);
+      } else {
+        // Fallback to jsQR for iOS Safari/Chrome and other browsers
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        const scanFrame = () => {
+          if (!videoRef.current || !context) return;
+
+          if (
+            videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA
+          ) {
+            canvas.height = videoRef.current.videoHeight;
+            canvas.width = videoRef.current.videoWidth;
+            context.drawImage(
+              videoRef.current,
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
+            const imageData = context.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
+            const code = jsQR(
+              imageData.data,
+              imageData.width,
+              imageData.height,
+              {
+                inversionAttempts: "dontInvert",
+              }
+            );
+
+            if (code) {
+              stopScan();
+              onScan(code.data);
+              return;
+            }
+          }
+          // Check if still scanning before continuing
+          if (videoRef.current.srcObject) {
+            scanLoopRef.current = requestAnimationFrame(scanFrame);
+          }
+        };
+        scanLoopRef.current = requestAnimationFrame(scanFrame);
+      }
+    } catch (error) {
+      console.error("QR scan failed", error);
+      setIsScanning(false);
       setError(
-        "Unable to access camera. Please grant camera permissions and try again."
+        "Camera access denied or unavailable. Please paste the address manually."
       );
-      setScanning(false);
     }
-  };
-
-  /**
-   * Stop camera and scanning
-   */
-  const stopScanning = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
-    }
-    setScanning(false);
-  };
-
-  /**
-   * Scan QR code from video stream
-   */
-  const scanQRCode = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
-
-    if (!context) return;
-
-    // Set canvas size to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // Draw video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // Get image data
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-    // Try to decode QR code using jsQR library
-    try {
-      // Note: You would need to install jsQR library for actual QR code decoding
-      // For now, this is a placeholder for the scanning logic
-      // In production, use: import jsQR from "jsqr";
-      // const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-      // Simulate QR code detection for demo
-      // In production, replace with actual jsQR decoding
-    } catch (err) {
-      console.error("QR scan error:", err);
-    }
-
-    // Continue scanning if still active
-    if (scanning) {
-      requestAnimationFrame(scanQRCode);
-    }
-  };
+  }, [onScan, stopScan]);
 
   /**
    * Cleanup on unmount
    */
   useEffect(() => {
     return () => {
-      stopScanning();
+      stopScan();
     };
-  }, []);
+  }, [stopScan]);
 
   /**
    * Manual address input fallback
@@ -129,41 +163,46 @@ export default function QrScanner({ onScan }: QrScannerProps) {
     <div className="space-y-4">
       {/* Video Preview */}
       <div className="relative bg-black rounded-lg overflow-hidden">
-        <video
-          ref={videoRef}
-          className="w-full h-64 object-cover"
-          playsInline
-          muted
-        />
-        <canvas ref={canvasRef} className="hidden" />
-
-        {/* Scanning overlay */}
-        {scanning && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-48 h-48 border-2 border-[hsl(var(--look-yellow))] rounded-lg"></div>
+        {isScanning ? (
+          <video
+            ref={videoRef}
+            className="w-full h-64 object-cover"
+            playsInline
+            autoPlay
+            muted
+          />
+        ) : (
+          <div className="w-full h-64 flex items-center justify-center bg-black">
+            {error ? (
+              <p className="text-red-400 text-center text-sm px-4">{error}</p>
+            ) : (
+              <p className="text-gray-400 text-center text-sm">
+                Click "Start Camera" to begin scanning
+              </p>
+            )}
           </div>
         )}
 
-        {/* Error message */}
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-4">
-            <p className="text-red-400 text-center text-sm">{error}</p>
+        {/* Scanning overlay */}
+        {isScanning && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-48 h-48 border-2 border-[hsl(var(--look-yellow))] rounded-lg"></div>
           </div>
         )}
       </div>
 
       {/* Controls */}
       <div className="space-y-3">
-        {!scanning ? (
+        {!isScanning ? (
           <Button
-            onClick={startScanning}
+            onClick={startScan}
             className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-white font-semibold py-3"
           >
             Start Camera
           </Button>
         ) : (
           <Button
-            onClick={stopScanning}
+            onClick={stopScan}
             variant="outline"
             className="w-full bg-[#2a2a2a] border-gray-700 hover:bg-gray-800 text-white py-3"
           >
@@ -180,6 +219,11 @@ export default function QrScanner({ onScan }: QrScannerProps) {
               placeholder="Paste wallet address"
               value={manualAddress}
               onChange={(e) => setManualAddress(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleManualSubmit();
+                }
+              }}
               className="flex-1 bg-[#2a2a2a] border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(var(--look-yellow))]"
             />
             <Button
@@ -199,4 +243,3 @@ export default function QrScanner({ onScan }: QrScannerProps) {
     </div>
   );
 }
-
