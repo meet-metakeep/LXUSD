@@ -382,6 +382,49 @@ export default function Home() {
   }, [wallet?.address, receiveDialogOpen, qrScanDialogOpen]);
 
   /**
+   * Check if an error indicates insufficient gas/balance
+   */
+  const isInsufficientGasError = (error: unknown): boolean => {
+    if (typeof error === "string") {
+      const errorLower = error.toLowerCase();
+      const insufficientGasKeywords = [
+        "insufficient funds",
+        "insufficient balance",
+        "insufficient gas",
+        "not enough",
+        "gas required exceeds",
+        "gas price too low",
+        "out of gas",
+        "insufficient xrp",
+        "insufficient native",
+      ];
+      return insufficientGasKeywords.some((keyword) =>
+        errorLower.includes(keyword)
+      );
+    }
+
+    if (error instanceof Error) {
+      const errorMessage = error.message.toLowerCase();
+      const insufficientGasKeywords = [
+        "insufficient funds",
+        "insufficient balance",
+        "insufficient gas",
+        "not enough",
+        "gas required exceeds",
+        "gas price too low",
+        "out of gas",
+        "insufficient xrp",
+        "insufficient native",
+      ];
+      return insufficientGasKeywords.some((keyword) =>
+        errorMessage.includes(keyword)
+      );
+    }
+
+    return false;
+  };
+
+  /**
    * Handle send LOOK tokens with MetaKeep transaction signing
    */
   const handleSend = async () => {
@@ -422,9 +465,15 @@ export default function Home() {
 
       if (!transferDataResponse.ok) {
         const errorData = await transferDataResponse.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || "Failed to create token transfer transaction"
-        );
+        const errorMessage =
+          errorData.message || "Failed to create token transfer transaction";
+        if (
+          isInsufficientGasError(errorMessage) ||
+          isInsufficientGasError(errorData)
+        ) {
+          throw new Error("INSUFFICIENT_GAS");
+        }
+        throw new Error(errorMessage);
       }
 
       const transferData = await transferDataResponse.json();
@@ -442,12 +491,32 @@ export default function Home() {
 
       if (!paramsResponse.ok) {
         const errorData = await paramsResponse.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || "Failed to prepare transaction params"
-        );
+        const errorMessage =
+          errorData.message || "Failed to prepare transaction params";
+        if (
+          isInsufficientGasError(errorMessage) ||
+          isInsufficientGasError(errorData)
+        ) {
+          throw new Error("INSUFFICIENT_GAS");
+        }
+        throw new Error(errorMessage);
       }
 
       const txParams = await paramsResponse.json();
+
+      // Check if wallet has sufficient XRP balance for gas BEFORE MetaKeep popup
+      // Calculate estimated gas cost: gas * maxFeePerGas (in wei)
+      const gasCostWei = BigInt(txParams.gas) * BigInt(txParams.maxFeePerGas);
+      // Convert wei to XRP (1 XRP = 10^18 wei)
+      const gasCostXRP = Number(gasCostWei) / 1e18;
+
+      // Add a small buffer (10% extra) to account for potential fee fluctuations
+      const requiredXRP = gasCostXRP * 1.1;
+
+      // Check if wallet has enough XRP balance
+      if (!wallet.xrplBalance || wallet.xrplBalance < requiredXRP) {
+        throw new Error("INSUFFICIENT_GAS");
+      }
 
       // Create ERC-20 token transfer transaction for XRPL EVM Testnet
       const transaction = {
@@ -516,9 +585,15 @@ export default function Home() {
 
       if (!submitResponse.ok) {
         const errorData = await submitResponse.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || "Failed to submit transaction to network"
-        );
+        const errorMessage =
+          errorData.message || "Failed to submit transaction to network";
+        if (
+          isInsufficientGasError(errorMessage) ||
+          isInsufficientGasError(errorData)
+        ) {
+          throw new Error("INSUFFICIENT_GAS");
+        }
+        throw new Error(errorMessage);
       }
 
       const submitData = await submitResponse.json();
@@ -554,12 +629,26 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Failed to send transaction:", error);
-      showToast({
-        kind: "error",
-        message: `Send failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-      });
+
+      // Check if this is an insufficient gas error
+      if (
+        error instanceof Error &&
+        (error.message === "INSUFFICIENT_GAS" || isInsufficientGasError(error))
+      ) {
+        showToast({
+          kind: "error",
+          message: "Insufficient gas",
+          actionLabel: "Claim here",
+          actionHref: "https://faucet.xrplevm.org/",
+        });
+      } else {
+        showToast({
+          kind: "error",
+          message: `Send failed: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        });
+      }
     } finally {
       setIsSending(false);
     }
