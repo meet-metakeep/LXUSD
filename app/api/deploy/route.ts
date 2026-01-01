@@ -3,7 +3,7 @@
  * This route handles contract deployment and initial minting
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * Handle POST request to deploy contract and mint tokens

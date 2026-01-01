@@ -59,6 +59,7 @@ export default function QrScanner({ onScan }: QrScannerProps) {
 
       // Try to use BarcodeDetector if available (Chrome, Edge on Android)
       if ("BarcodeDetector" in window) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const detector = new (window as any).BarcodeDetector({
           formats: ["qr_code"],
         });
@@ -177,7 +178,7 @@ export default function QrScanner({ onScan }: QrScannerProps) {
               <p className="text-red-400 text-center text-sm px-4">{error}</p>
             ) : (
               <p className="text-gray-400 text-center text-sm">
-                Click "Start Camera" to begin scanning
+                Click &quot;Start Camera&quot; to begin scanning
               </p>
             )}
           </div>
