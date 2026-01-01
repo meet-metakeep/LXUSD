@@ -804,7 +804,19 @@ export default function Home() {
           <Button
             variant="outline"
             className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
-            onClick={() => setSendDialogOpen(true)}
+            onClick={() => {
+              // Check if user has zero LXUSD balance
+              if (wallet && wallet.lookBalance <= 0) {
+                showToast({
+                  kind: "error",
+                  message: "You need LXUSD to send. Buy some first!",
+                  actionLabel: "Buy LXUSD",
+                  actionHref: "https://lxusd-faucet.vercel.app/",
+                });
+                return;
+              }
+              setSendDialogOpen(true);
+            }}
             disabled={!wallet}
           >
             <Send className="w-4 h-4 mr-2" />
@@ -919,47 +931,65 @@ export default function Home() {
                 Send LXUSD
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 pt-2">
-              <Button
-                variant="outline"
-                className="w-full bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
-                onClick={() => setQrScanAddressDialogOpen(true)}
-              >
-                <ScanLine className="w-5 h-5 mr-2" />
-                Scan QR Code
-              </Button>
-              <div>
-                <label className="text-sm text-gray-400 block mb-2">
-                  Recipient Wallet Address
-                </label>
-                <Input
-                  placeholder="Enter wallet address"
-                  value={recipientAddress}
-                  onChange={(e) => setRecipientAddress(e.target.value)}
-                  className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 rounded-xl"
-                />
+            {wallet && wallet.lookBalance <= 0 ? (
+              <div className="space-y-4 pt-2 text-center py-6">
+                <p className="text-gray-400 mb-4">
+                  You don&apos;t have any LXUSD to send. Buy some first!
+                </p>
+                <Button
+                  className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 text-base rounded-2xl"
+                  onClick={() => {
+                    setSendDialogOpen(false);
+                    window.open("https://lxusd-faucet.vercel.app/", "_blank");
+                  }}
+                >
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  BUY $LXUSD
+                </Button>
               </div>
-              <div>
-                <label className="text-sm text-gray-400 block mb-2">
-                  Amount (LXUSD)
-                </label>
-                <Input
-                  placeholder="1.00"
-                  type="number"
-                  step="0.01"
-                  value={sendAmount}
-                  onChange={(e) => setSendAmount(e.target.value)}
-                  className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 text-lg font-semibold rounded-xl"
-                />
+            ) : (
+              <div className="space-y-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="w-full bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+                  onClick={() => setQrScanAddressDialogOpen(true)}
+                >
+                  <ScanLine className="w-5 h-5 mr-2" />
+                  Scan QR Code
+                </Button>
+                <div>
+                  <label className="text-sm text-gray-400 block mb-2">
+                    Recipient Wallet Address
+                  </label>
+                  <Input
+                    placeholder="Enter wallet address"
+                    value={recipientAddress}
+                    onChange={(e) => setRecipientAddress(e.target.value)}
+                    className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400 block mb-2">
+                    Amount (LXUSD)
+                  </label>
+                  <Input
+                    placeholder="1.00"
+                    type="number"
+                    step="0.01"
+                    value={sendAmount}
+                    onChange={(e) => setSendAmount(e.target.value)}
+                    className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 text-lg font-semibold rounded-xl"
+                  />
+                </div>
+                <Button
+                  className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 text-base rounded-2xl"
+                  onClick={handleSend}
+                  disabled={!recipientAddress || !sendAmount || isSending}
+                >
+                  {isSending ? "Sending..." : "Send LXUSD"}
+                </Button>
               </div>
-              <Button
-                className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 text-base rounded-2xl"
-                onClick={handleSend}
-                disabled={!recipientAddress || !sendAmount || isSending}
-              >
-                {isSending ? "Sending..." : "Send LXUSD"}
-              </Button>
-            </div>
+            )}
           </DialogContent>
         </Dialog>
 
