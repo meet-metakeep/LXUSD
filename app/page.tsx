@@ -770,14 +770,14 @@ export default function Home() {
             Total Balance
           </p>
           <h2 className="text-5xl font-bold text-white mb-3">
-            ${wallet?.lxusdBalance.toFixed(0) || "0"}
+            ${wallet?.lxusdBalance?.toFixed(0) ?? "0"}
           </h2>
           <div className="flex items-center justify-center gap-2">
             <span className="text-[#C890FF] font-semibold">
-              {wallet?.lxusdBalance.toFixed(2) || "0.00"} LXUSD
+              {wallet?.lxusdBalance?.toFixed(2) ?? "0.00"} LXUSD
             </span>
             <span className="text-gray-500">
-              ≈ ${wallet?.usdValue.toFixed(2) || "0.00"}
+              ≈ ${wallet?.usdValue?.toFixed(2) ?? "0.00"}
             </span>
           </div>
         </div>
@@ -802,7 +802,7 @@ export default function Home() {
             className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
             onClick={() => {
               // Check if user has zero LXUSD balance
-              if (wallet && wallet.lxusdBalance <= 0) {
+              if (wallet && (wallet.lxusdBalance ?? 0) <= 0) {
                 showToast({
                   kind: "error",
                   message: "Get LXUSD to send",
@@ -846,10 +846,10 @@ export default function Home() {
             </div>
             <div className="text-right">
               <p className="text-white font-semibold">
-                {wallet?.lxusdBalance.toFixed(2) || "0.00"}
+                {wallet?.lxusdBalance?.toFixed(2) ?? "0.00"}
               </p>
               <p className="text-gray-400 text-sm">
-                ${wallet?.usdValue.toFixed(2) || "0.00"}
+                ${wallet?.usdValue?.toFixed(2) ?? "0.00"}
               </p>
             </div>
           </div>
@@ -867,10 +867,10 @@ export default function Home() {
             </div>
             <div className="text-right">
               <p className="text-white font-semibold">
-                {wallet?.xrplBalance.toFixed(1) || "0.0"}
+                {wallet?.xrplBalance?.toFixed(1) ?? "0.0"}
               </p>
               <p className="text-gray-400 text-sm">
-                {wallet && wallet.xrplBalance > 0
+                {wallet?.xrplBalance && wallet.xrplBalance > 0
                   ? `$${(wallet.xrplBalance * 0.5).toFixed(2)}`
                   : "$0.00"}
               </p>
@@ -925,7 +925,7 @@ export default function Home() {
                 Send LXUSD
               </DialogTitle>
             </DialogHeader>
-            {wallet && wallet.lxusdBalance <= 0 ? (
+            {wallet && (wallet.lxusdBalance ?? 0) <= 0 ? (
               <div className="space-y-4 pt-2 text-center py-6">
                 <p className="text-gray-400 mb-4">
                   You don&apos;t have any LXUSD to send. Get some first!
