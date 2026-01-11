@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
-  <rect width="256" height="256" rx="128" fill="#F6AD27"/>
+  <defs>
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7919FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C890FF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="128" fill="url(#purpleGradient)"/>
   <path
     d="M92 72h24v112h60v20H92V72z"
-    fill="#0B0B0B"
+    fill="#FFFFFF"
   />
 </svg>
-
-
-
-
-
-
-
