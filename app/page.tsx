@@ -698,7 +698,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen wallet-background flex items-center justify-center p-4">
-      <div className="w-full max-w-[440px] bg-[#2A2A2A] rounded-3xl shadow-[0_24px_80px_rgba(0,0,0,0.9)] border border-[#7919FF]/20 overflow-hidden">
+      <div className="w-full max-w-[440px] bg-[#000000] rounded-3xl shadow-[0_24px_80px_rgba(0,0,0,0.9)] border border-[#7919FF]/20 overflow-hidden">
         {/* Header */}
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -721,43 +721,37 @@ export default function Home() {
                 variant="ghost"
                 size="icon"
                 className="text-gray-400 hover:text-[#C890FF] hover:bg-white/5 border border-white/10 rounded-xl transition-all"
-                onClick={() => setShowUserMenu(!showUserMenu)}
+                onClick={() => {
+                  if (!wallet) {
+                    // If logged out, directly initiate MetaKeep
+                    handleLogin();
+                  } else {
+                    // If logged in, show dropdown menu
+                    setShowUserMenu(!showUserMenu);
+                  }
+                }}
               >
                 <User className="w-5 h-5" />
               </Button>
 
               {/* User dropdown menu */}
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-[#2A2A2A] rounded-xl shadow-xl border border-[#7919FF]/30 z-50 overflow-hidden">
-                  {wallet ? (
-                    <>
-                      <div className="p-4 border-b border-white/10">
-                        <div className="flex items-center gap-2 text-sm text-gray-300">
-                          <Mail className="w-4 h-4" />
-                          <span className="truncate">
-                            {wallet.email || "Email not available"}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full p-3 flex items-center gap-2 text-red-400 hover:bg-white/5 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span className="text-sm font-medium">Logout</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={handleLogin}
-                      className="w-full p-3 flex items-center gap-2 text-[#C890FF] hover:bg-white/5 transition-colors"
-                    >
-                      <LogIn className="w-4 h-4" />
-                      <span className="text-sm font-medium">
-                        Connect Wallet
+              {showUserMenu && wallet && (
+                <div className="absolute right-0 mt-2 w-64 bg-[#000000] rounded-xl shadow-xl border border-[#7919FF]/30 z-50 overflow-hidden">
+                  <div className="p-4 border-b border-white/10">
+                    <div className="flex items-center gap-2 text-sm text-gray-300">
+                      <Mail className="w-4 h-4" />
+                      <span className="truncate">
+                        {wallet.email || "Email not available"}
                       </span>
-                    </button>
-                  )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full p-3 flex items-center gap-2 text-red-400 hover:bg-white/5 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-sm font-medium">Logout</span>
+                  </button>
                 </div>
               )}
             </div>
