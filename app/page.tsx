@@ -841,7 +841,7 @@ export default function Home() {
               </div>
               <div>
                 <p className="text-white font-semibold">LXUSD</p>
-                <p className="text-gray-400 text-sm">Stablecoin</p>
+                <p className="text-gray-400 text-sm">Attention token</p>
               </div>
             </div>
             <div className="text-right">
@@ -862,7 +862,7 @@ export default function Home() {
               </div>
               <div>
                 <p className="text-white font-semibold">XRPL EVM</p>
-                <p className="text-gray-400 text-sm">Gas Token</p>
+                <p className="text-gray-400 text-sm">Network token</p>
               </div>
             </div>
             <div className="text-right">
