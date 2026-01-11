@@ -74,11 +74,10 @@ type MetaKeepSignTxResponse = {
 interface WalletData {
   address: string;
   email?: string; // Email is optional as MetaKeep prompts user during first connection
-  lookBalance: number; // LXUSD balance
   lxusdBalance: number; // LXUSD token balance
   usdcBalance: number; // Backward compatibility
   xrplBalance: number;
-  lookUsdValue: number;
+  usdValue: number;
 }
 
 /**
@@ -159,7 +158,7 @@ export default function Home() {
    * Load cached wallet data from localStorage
    */
   useEffect(() => {
-    const cachedWallet = localStorage.getItem("lookWalletData");
+    const cachedWallet = localStorage.getItem("walletData");
     if (cachedWallet && !isLoggedOut) {
       try {
         const walletData = JSON.parse(cachedWallet);
@@ -174,11 +173,10 @@ export default function Home() {
               xrplBalance: balances.xrplBalance,
               lxusdBalance: balances.lxusdBalance,
               usdcBalance: balances.usdcBalance,
-              lookBalance: balances.lxusdBalance,
-              lookUsdValue: balances.lxusdBalance,
+              usdValue: balances.lxusdBalance,
             };
             setWallet(next);
-            localStorage.setItem("lookWalletData", JSON.stringify(next));
+            localStorage.setItem("walletData", JSON.stringify(next));
           })();
         }
         return;
@@ -324,7 +322,7 @@ export default function Home() {
 
         // Check cached data if email not found in response or MetaKeep storage
         if (!userEmail) {
-          const cachedData = localStorage.getItem("lookWalletData");
+          const cachedData = localStorage.getItem("walletData");
           if (cachedData) {
             try {
               const parsed = JSON.parse(cachedData);
@@ -346,15 +344,14 @@ export default function Home() {
           address,
           email: userEmail, // Store email if found, otherwise undefined
           lxusdBalance: balances.lxusdBalance, // LXUSD token balance
-          lookBalance: balances.lxusdBalance, // Display LXUSD
           usdcBalance: balances.usdcBalance, // Backward compatibility
           xrplBalance: balances.xrplBalance,
-          lookUsdValue: balances.lxusdBalance, // 1 LXUSD = 1 USD
+          usdValue: balances.lxusdBalance, // 1 LXUSD = 1 USD
         };
 
         setWallet(walletData);
         // Cache wallet data
-        localStorage.setItem("lookWalletData", JSON.stringify(walletData));
+        localStorage.setItem("walletData", JSON.stringify(walletData));
       } else {
         console.error("MetaKeep wallet connection failed");
       }
@@ -425,7 +422,7 @@ export default function Home() {
   };
 
   /**
-   * Handle send LOOK tokens with MetaKeep transaction signing
+   * Handle send LXUSD tokens with MetaKeep transaction signing
    */
   const handleSend = async () => {
     if (!wallet || !recipientAddress || !sendAmount) return;
@@ -620,10 +617,9 @@ export default function Home() {
             xrplBalance: balances.xrplBalance,
             lxusdBalance: balances.lxusdBalance,
             usdcBalance: balances.usdcBalance,
-            lookBalance: balances.lxusdBalance,
-            lookUsdValue: balances.lxusdBalance,
+            usdValue: balances.lxusdBalance,
           };
-          localStorage.setItem("lookWalletData", JSON.stringify(next));
+          localStorage.setItem("walletData", JSON.stringify(next));
           return next;
         });
       }
@@ -671,7 +667,7 @@ export default function Home() {
     setWallet(null);
     setShowUserMenu(false);
     setIsLoggedOut(true);
-    localStorage.removeItem("lookWalletData");
+    localStorage.removeItem("walletData");
   };
 
   /**
@@ -702,14 +698,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen wallet-background flex items-center justify-center p-4">
-      <div className="w-full max-w-[440px] bg-[#141414] rounded-3xl shadow-[0_24px_80px_rgba(0,0,0,0.75)] overflow-hidden">
+      <div className="w-full max-w-[440px] bg-[#2A2A2A] rounded-3xl shadow-[0_24px_80px_rgba(0,0,0,0.9)] border border-[#7919FF]/20 overflow-hidden">
         {/* Header */}
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center">
-              <span className="text-black font-extrabold text-lg leading-none">
-                L
-              </span>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7919FF] to-[#C890FF] flex items-center justify-center shadow-lg shadow-[#7919FF]/30">
+              <span className="text-white font-bold text-lg">L</span>
             </div>
             <h1 className="text-xl font-semibold text-white">LXUSD Wallet</h1>
           </div>
@@ -717,7 +711,7 @@ export default function Home() {
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-300 hover:text-white hover:bg-white/5 border border-white/10 rounded-xl"
+              className="text-gray-400 hover:text-[#C890FF] hover:bg-white/5 border border-white/10 rounded-xl transition-all"
               onClick={handleShowReceiveQR}
             >
               <QrCode className="w-5 h-5" />
@@ -726,7 +720,7 @@ export default function Home() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-gray-300 hover:text-white hover:bg-white/5 border border-white/10 rounded-xl"
+                className="text-gray-400 hover:text-[#C890FF] hover:bg-white/5 border border-white/10 rounded-xl transition-all"
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 <User className="w-5 h-5" />
@@ -734,7 +728,7 @@ export default function Home() {
 
               {/* User dropdown menu */}
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-[#1b1b1b] rounded-xl shadow-xl border border-white/10 z-50 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-64 bg-[#000000] rounded-xl shadow-xl border border-[#7919FF]/30 z-50 overflow-hidden">
                   {wallet ? (
                     <>
                       <div className="p-4 border-b border-white/10">
@@ -756,7 +750,7 @@ export default function Home() {
                   ) : (
                     <button
                       onClick={handleLogin}
-                      className="w-full p-3 flex items-center gap-2 text-[hsl(var(--look-yellow))] hover:bg-white/5 transition-colors"
+                      className="w-full p-3 flex items-center gap-2 text-[#C890FF] hover:bg-white/5 transition-colors"
                     >
                       <LogIn className="w-4 h-4" />
                       <span className="text-sm font-medium">
@@ -772,16 +766,18 @@ export default function Home() {
 
         {/* Balance Section */}
         <div className="p-6 text-center">
-          <p className="text-gray-400 text-sm mb-2">Total Balance</p>
+          <p className="text-gray-400 text-sm mb-2 font-medium">
+            Total Balance
+          </p>
           <h2 className="text-5xl font-bold text-white mb-3">
-            ${wallet?.lookBalance.toFixed(0) || "0"}
+            ${wallet?.lxusdBalance.toFixed(0) || "0"}
           </h2>
           <div className="flex items-center justify-center gap-2">
-            <span className="text-[hsl(var(--look-yellow))] font-semibold">
-              {wallet?.lookBalance.toFixed(2) || "0.00"} LXUSD
+            <span className="text-[#C890FF] font-semibold">
+              {wallet?.lxusdBalance.toFixed(2) || "0.00"} LXUSD
             </span>
             <span className="text-gray-500">
-              (${wallet?.lookUsdValue.toFixed(2) || "0.00"})
+              ≈ ${wallet?.usdValue.toFixed(2) || "0.00"}
             </span>
           </div>
         </div>
@@ -789,13 +785,13 @@ export default function Home() {
         {/* Buy Button */}
         <div className="px-6 mb-4">
           <Button
-            className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 rounded-2xl text-base"
+            className="w-full bg-gradient-to-r from-[#7919FF] to-[#C890FF] hover:opacity-90 text-white font-semibold py-5 rounded-2xl text-base shadow-lg shadow-[#7919FF]/30 transition-all"
             onClick={() =>
               window.open("https://lxusd-faucet.vercel.app/", "_blank")
             }
           >
             <ShoppingCart className="w-5 h-5 mr-2" />
-            BUY $LXUSD
+            GET LXUSD
           </Button>
         </div>
 
@@ -803,14 +799,14 @@ export default function Home() {
         <div className="px-6 mb-6 grid grid-cols-2 gap-3">
           <Button
             variant="outline"
-            className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+            className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
             onClick={() => {
               // Check if user has zero LXUSD balance
-              if (wallet && wallet.lookBalance <= 0) {
+              if (wallet && wallet.lxusdBalance <= 0) {
                 showToast({
                   kind: "error",
-                  message: "Buy $LXUSD to send",
-                  actionLabel: "Buy LXUSD",
+                  message: "Get LXUSD to send",
+                  actionLabel: "Get LXUSD",
                   actionHref: "https://lxusd-faucet.vercel.app/",
                 });
                 return;
@@ -824,7 +820,7 @@ export default function Home() {
           </Button>
           <Button
             variant="outline"
-            className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+            className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
             onClick={() => setReceiveDialogOpen(true)}
             disabled={!wallet}
           >
@@ -837,38 +833,36 @@ export default function Home() {
         <div className="px-6 pb-6">
           <h3 className="text-white font-semibold mb-4">Your Assets</h3>
 
-          {/* LOOK Token */}
-          <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-3 flex items-center justify-between border border-white/10">
+          {/* LXUSD Token */}
+          <div className="bg-[#000000] rounded-2xl p-4 mb-3 flex items-center justify-between border border-white/10 hover:border-[#7919FF]/50 transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[hsl(var(--look-yellow))] flex items-center justify-center">
-                <span className="text-black font-extrabold text-lg leading-none">
-                  L
-                </span>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7919FF] to-[#C890FF] flex items-center justify-center shadow-md">
+                <span className="text-white font-bold text-lg">L</span>
               </div>
               <div>
-                <p className="text-white font-semibold">$LXUSD</p>
-                <p className="text-gray-400 text-sm">Attention Token</p>
+                <p className="text-white font-semibold">LXUSD</p>
+                <p className="text-gray-400 text-sm">Stablecoin</p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-white font-semibold">
-                {wallet?.lookBalance.toFixed(2) || "0.00"}
+                {wallet?.lxusdBalance.toFixed(2) || "0.00"}
               </p>
               <p className="text-gray-400 text-sm">
-                ${wallet?.lookUsdValue.toFixed(2) || "0.00"}
+                ${wallet?.usdValue.toFixed(2) || "0.00"}
               </p>
             </div>
           </div>
 
           {/* XRPL Token */}
-          <div className="bg-[#1b1b1b] rounded-2xl p-4 mb-4 flex items-center justify-between border border-white/10">
+          <div className="bg-[#000000] rounded-2xl p-4 mb-4 flex items-center justify-between border border-white/10 hover:border-[#32E685]/50 transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">X</span>
+              <div className="w-10 h-10 rounded-full bg-[#32E685] flex items-center justify-center shadow-md shadow-[#32E685]/20">
+                <span className="text-black font-semibold text-sm">X</span>
               </div>
               <div>
                 <p className="text-white font-semibold">XRPL EVM</p>
-                <p className="text-gray-400 text-sm">Network Token</p>
+                <p className="text-gray-400 text-sm">Gas Token</p>
               </div>
             </div>
             <div className="text-right">
@@ -887,17 +881,17 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+              className="bg-[#000000] border-white/10 hover:border-[#32E685] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
               onClick={() =>
                 window.open("https://faucet.xrplevm.org/", "_blank")
               }
             >
               <ShoppingCart className="w-4 h-4 mr-2" />
-              Buy XRPL
+              Get XRPL
             </Button>
             <Button
               variant="outline"
-              className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+              className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
               onClick={() => {
                 showToast({
                   kind: "info",
@@ -925,51 +919,51 @@ export default function Home() {
 
         {/* Send Dialog */}
         <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
-          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[380px] rounded-2xl">
+          <DialogContent className="bg-[#2A2A2A] border-[#7919FF]/30 text-white max-w-[380px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold text-white">
                 Send LXUSD
               </DialogTitle>
             </DialogHeader>
-            {wallet && wallet.lookBalance <= 0 ? (
+            {wallet && wallet.lxusdBalance <= 0 ? (
               <div className="space-y-4 pt-2 text-center py-6">
                 <p className="text-gray-400 mb-4">
-                  You don&apos;t have any LXUSD to send. Buy some first!
+                  You don&apos;t have any LXUSD to send. Get some first!
                 </p>
                 <Button
-                  className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 text-base rounded-2xl"
+                  className="w-full bg-gradient-to-r from-[#7919FF] to-[#C890FF] hover:opacity-90 text-white font-semibold py-5 text-base rounded-2xl shadow-lg shadow-[#7919FF]/30 transition-all"
                   onClick={() => {
                     setSendDialogOpen(false);
                     window.open("https://lxusd-faucet.vercel.app/", "_blank");
                   }}
                 >
                   <ShoppingCart className="w-5 h-5 mr-2" />
-                  BUY $LXUSD
+                  GET LXUSD
                 </Button>
               </div>
             ) : (
               <div className="space-y-3 pt-2">
                 <Button
                   variant="outline"
-                  className="w-full bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white py-5 rounded-2xl"
+                  className="w-full bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
                   onClick={() => setQrScanAddressDialogOpen(true)}
                 >
                   <ScanLine className="w-5 h-5 mr-2" />
                   Scan QR Code
                 </Button>
                 <div>
-                  <label className="text-sm text-gray-400 block mb-2">
+                  <label className="text-sm text-gray-400 block mb-2 font-medium">
                     Recipient Wallet Address
                   </label>
                   <Input
                     placeholder="Enter wallet address"
                     value={recipientAddress}
                     onChange={(e) => setRecipientAddress(e.target.value)}
-                    className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 rounded-xl"
+                    className="bg-[#000000] border-white/10 focus:border-[#7919FF] text-white placeholder:text-gray-500 h-11 rounded-xl transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-400 block mb-2">
+                  <label className="text-sm text-gray-400 block mb-2 font-medium">
                     Amount (LXUSD)
                   </label>
                   <Input
@@ -978,11 +972,11 @@ export default function Home() {
                     step="0.01"
                     value={sendAmount}
                     onChange={(e) => setSendAmount(e.target.value)}
-                    className="bg-[#1b1b1b] border-white/10 text-white placeholder:text-gray-500 h-11 text-lg font-semibold rounded-xl"
+                    className="bg-[#000000] border-white/10 focus:border-[#7919FF] text-white placeholder:text-gray-500 h-11 text-lg font-semibold rounded-xl transition-all"
                   />
                 </div>
                 <Button
-                  className="w-full bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black font-semibold py-5 text-base rounded-2xl"
+                  className="w-full bg-gradient-to-r from-[#7919FF] to-[#C890FF] hover:opacity-90 text-white font-semibold py-5 text-base rounded-2xl shadow-lg shadow-[#7919FF]/30 transition-all"
                   onClick={handleSend}
                   disabled={!recipientAddress || !sendAmount || isSending}
                 >
@@ -995,7 +989,7 @@ export default function Home() {
 
         {/* Receive Dialog */}
         <Dialog open={receiveDialogOpen} onOpenChange={setReceiveDialogOpen}>
-          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[360px] rounded-2xl">
+          <DialogContent className="bg-[#2A2A2A] border-[#7919FF]/30 text-white max-w-[360px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-white">
                 Receive LXUSD
@@ -1005,7 +999,7 @@ export default function Home() {
               <div className="space-y-3 pt-2">
                 {/* QR Code */}
                 <div className="flex justify-center">
-                  <div className="bg-white p-3 rounded-lg">
+                  <div className="bg-white p-3 rounded-xl shadow-lg">
                     {qrCodeUrl && (
                       <Image
                         src={qrCodeUrl}
@@ -1020,12 +1014,12 @@ export default function Home() {
 
                 {/* Wallet Address */}
                 <div className="text-center">
-                  <p className="text-xs text-gray-400 mb-3 break-all px-2">
+                  <p className="text-xs text-gray-400 mb-3 break-all px-2 font-mono">
                     {wallet.address}
                   </p>
                   <Button
                     variant="outline"
-                    className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white w-full rounded-2xl"
+                    className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white w-full rounded-2xl transition-all"
                     onClick={copyAddress}
                   >
                     <QrCode className="w-4 h-4 mr-2" />
@@ -1039,7 +1033,7 @@ export default function Home() {
                   Please connect your wallet to receive tokens
                 </p>
                 <Button
-                  className="bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black rounded-2xl"
+                  className="bg-gradient-to-r from-[#7919FF] to-[#C890FF] hover:opacity-90 text-white rounded-2xl shadow-lg shadow-[#7919FF]/30 transition-all"
                   onClick={() => {
                     setReceiveDialogOpen(false);
                     handleLogin();
@@ -1055,7 +1049,7 @@ export default function Home() {
 
         {/* QR Scanner Dialog for Wallet Address */}
         <Dialog open={qrScanDialogOpen} onOpenChange={setQrScanDialogOpen}>
-          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[360px] rounded-2xl">
+          <DialogContent className="bg-[#2A2A2A] border-[#7919FF]/30 text-white max-w-[360px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-white">
                 Your Wallet QR Code
@@ -1065,7 +1059,7 @@ export default function Home() {
               <div className="space-y-4 pt-2">
                 {/* QR Code */}
                 <div className="flex justify-center">
-                  <div className="bg-white p-3 rounded-lg">
+                  <div className="bg-white p-3 rounded-xl shadow-lg">
                     {qrCodeUrl && (
                       <Image
                         src={qrCodeUrl}
@@ -1080,12 +1074,12 @@ export default function Home() {
 
                 {/* Wallet Address */}
                 <div className="text-center">
-                  <p className="text-xs text-gray-400 mb-3 break-all px-2">
+                  <p className="text-xs text-gray-400 mb-3 break-all px-2 font-mono">
                     {wallet.address}
                   </p>
                   <Button
                     variant="outline"
-                    className="bg-[#1b1b1b] border-white/10 hover:bg-white/5 text-white w-full rounded-2xl"
+                    className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white w-full rounded-2xl transition-all"
                     onClick={copyAddress}
                   >
                     <QrCode className="w-4 h-4 mr-2" />
@@ -1099,7 +1093,7 @@ export default function Home() {
                   Please connect your wallet to view QR code
                 </p>
                 <Button
-                  className="bg-[hsl(var(--look-yellow))] hover:bg-[hsl(var(--look-yellow))]/90 text-black rounded-2xl"
+                  className="bg-gradient-to-r from-[#7919FF] to-[#C890FF] hover:opacity-90 text-white rounded-2xl shadow-lg shadow-[#7919FF]/30 transition-all"
                   onClick={() => {
                     setQrScanDialogOpen(false);
                     handleLogin();
@@ -1118,7 +1112,7 @@ export default function Home() {
           open={qrScanAddressDialogOpen}
           onOpenChange={setQrScanAddressDialogOpen}
         >
-          <DialogContent className="bg-[#141414] border-white/10 text-white max-w-[400px] rounded-2xl">
+          <DialogContent className="bg-[#2A2A2A] border-[#7919FF]/30 text-white max-w-[400px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold text-white">
                 Scan Recipient QR Code
@@ -1134,7 +1128,7 @@ export default function Home() {
       {/* Bottom toast (outside the wallet card) */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[60] w-[min(520px,calc(100vw-24px))] -translate-x-1/2">
-          <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0f0f0f]/95 px-4 py-3 shadow-[0_16px_60px_rgba(0,0,0,0.65)] backdrop-blur">
+          <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl border border-[#7919FF]/30 bg-[#2A2A2A]/95 px-4 py-3 shadow-[0_16px_60px_rgba(0,0,0,0.8)] backdrop-blur-xl">
             <div className="min-w-0">
               <p className="text-sm text-gray-100 truncate">{toast.message}</p>
             </div>
@@ -1144,14 +1138,14 @@ export default function Home() {
                   href={toast.actionHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-200 hover:text-white underline underline-offset-4 whitespace-nowrap"
+                  className="text-sm text-[#C890FF] hover:text-[#7919FF] underline underline-offset-4 whitespace-nowrap transition-colors"
                 >
                   {toast.actionLabel}
                 </a>
               )}
               <button
                 onClick={() => setToast(null)}
-                className="text-xs text-gray-400 hover:text-gray-200 whitespace-nowrap"
+                className="text-xs text-gray-400 hover:text-gray-200 whitespace-nowrap transition-colors"
               >
                 Dismiss
               </button>

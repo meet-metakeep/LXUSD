@@ -29,8 +29,10 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    /* LXUSD brand color #f6ad27 */
-    --look-yellow: 39 92% 56%;
+    /* XRPL EVM Brand Colors */
+    --xrpl-purple: 264 100% 55%;
+    --xrpl-lavender: 271 100% 78%;
+    --xrpl-green: 151 81% 53%;
   }
 
   .dark {
@@ -58,8 +60,10 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    /* LXUSD brand color #f6ad27 */
-    --look-yellow: 39 92% 56%;
+    /* XRPL EVM Brand Colors */
+    --xrpl-purple: 264 100% 55%;
+    --xrpl-lavender: 271 100% 78%;
+    --xrpl-green: 151 81% 53%;
   }
 }
 
@@ -71,8 +75,8 @@
     @apply bg-background text-foreground;
   }
   
-  /* Background gradient for wallet */
+  /* XRPL EVM themed background */
   .wallet-background {
-    background: #050505;
+    background: #000000;
   }
 }
