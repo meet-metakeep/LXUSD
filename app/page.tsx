@@ -728,7 +728,7 @@ export default function Home() {
 
               {/* User dropdown menu */}
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-[#000000] rounded-xl shadow-xl border border-[#7919FF]/30 z-50 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-64 bg-[#2A2A2A] rounded-xl shadow-xl border border-[#7919FF]/30 z-50 overflow-hidden">
                   {wallet ? (
                     <>
                       <div className="p-4 border-b border-white/10">
@@ -799,7 +799,7 @@ export default function Home() {
         <div className="px-6 mb-6 grid grid-cols-2 gap-3">
           <Button
             variant="outline"
-            className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
+            className="bg-[#2A2A2A] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
             onClick={() => {
               // Check if user has zero LXUSD balance
               if (wallet && (wallet.lxusdBalance ?? 0) <= 0) {
@@ -820,7 +820,7 @@ export default function Home() {
           </Button>
           <Button
             variant="outline"
-            className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
+            className="bg-[#2A2A2A] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
             onClick={() => setReceiveDialogOpen(true)}
             disabled={!wallet}
           >
@@ -834,7 +834,7 @@ export default function Home() {
           <h3 className="text-white font-semibold mb-4">Your Assets</h3>
 
           {/* LXUSD Token */}
-          <div className="bg-[#000000] rounded-2xl p-4 mb-3 flex items-center justify-between border border-white/10 hover:border-[#7919FF]/50 transition-all">
+          <div className="bg-[#2A2A2A] rounded-2xl p-4 mb-3 flex items-center justify-between border border-white/10 hover:border-[#7919FF]/50 transition-all">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7919FF] to-[#C890FF] flex items-center justify-center shadow-md">
                 <span className="text-white font-bold text-lg">L</span>
@@ -855,7 +855,7 @@ export default function Home() {
           </div>
 
           {/* XRPL Token */}
-          <div className="bg-[#000000] rounded-2xl p-4 mb-4 flex items-center justify-between border border-white/10 hover:border-[#32E685]/50 transition-all">
+          <div className="bg-[#2A2A2A] rounded-2xl p-4 mb-4 flex items-center justify-between border border-white/10 hover:border-[#32E685]/50 transition-all">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#32E685] flex items-center justify-center shadow-md shadow-[#32E685]/20">
                 <span className="text-black font-semibold text-sm">X</span>
@@ -881,7 +881,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              className="bg-[#000000] border-white/10 hover:border-[#32E685] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
+              className="bg-[#2A2A2A] border-white/10 hover:border-[#32E685] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
               onClick={() =>
                 window.open("https://faucet.xrplevm.org/", "_blank")
               }
@@ -891,7 +891,7 @@ export default function Home() {
             </Button>
             <Button
               variant="outline"
-              className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
+              className="bg-[#2A2A2A] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
               onClick={() => {
                 showToast({
                   kind: "info",
@@ -945,7 +945,7 @@ export default function Home() {
               <div className="space-y-3 pt-2">
                 <Button
                   variant="outline"
-                  className="w-full bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
+                  className="w-full bg-[#2A2A2A] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white py-5 rounded-2xl transition-all"
                   onClick={() => setQrScanAddressDialogOpen(true)}
                 >
                   <ScanLine className="w-5 h-5 mr-2" />
@@ -959,7 +959,7 @@ export default function Home() {
                     placeholder="Enter wallet address"
                     value={recipientAddress}
                     onChange={(e) => setRecipientAddress(e.target.value)}
-                    className="bg-[#000000] border-white/10 focus:border-[#7919FF] text-white placeholder:text-gray-500 h-11 rounded-xl transition-all"
+                    className="bg-[#2A2A2A] border-white/10 focus:border-[#7919FF] text-white placeholder:text-gray-500 h-11 rounded-xl transition-all"
                   />
                 </div>
                 <div>
@@ -972,7 +972,7 @@ export default function Home() {
                     step="0.01"
                     value={sendAmount}
                     onChange={(e) => setSendAmount(e.target.value)}
-                    className="bg-[#000000] border-white/10 focus:border-[#7919FF] text-white placeholder:text-gray-500 h-11 text-lg font-semibold rounded-xl transition-all"
+                    className="bg-[#2A2A2A] border-white/10 focus:border-[#7919FF] text-white placeholder:text-gray-500 h-11 text-lg font-semibold rounded-xl transition-all"
                   />
                 </div>
                 <Button
@@ -1019,7 +1019,7 @@ export default function Home() {
                   </p>
                   <Button
                     variant="outline"
-                    className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white w-full rounded-2xl transition-all"
+                    className="bg-[#2A2A2A] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white w-full rounded-2xl transition-all"
                     onClick={copyAddress}
                   >
                     <QrCode className="w-4 h-4 mr-2" />
@@ -1079,7 +1079,7 @@ export default function Home() {
                   </p>
                   <Button
                     variant="outline"
-                    className="bg-[#000000] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white w-full rounded-2xl transition-all"
+                    className="bg-[#2A2A2A] border-white/10 hover:border-[#7919FF] hover:bg-white/5 text-white w-full rounded-2xl transition-all"
                     onClick={copyAddress}
                   >
                     <QrCode className="w-4 h-4 mr-2" />

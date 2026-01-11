@@ -36,7 +36,7 @@
   }
 
   .dark {
-    --background: 0 0% 7%;
+    --background: 16 16% 16%;
     --foreground: 0 0% 98%;
     --card: 0 0% 10%;
     --card-foreground: 0 0% 98%;
@@ -71,12 +71,16 @@
   * {
     @apply border-border;
   }
+  html {
+    background: #2A2A2A;
+  }
   body {
-    @apply bg-background text-foreground;
+    background: #2A2A2A !important;
+    @apply text-foreground;
   }
   
   /* XRPL EVM themed background */
   .wallet-background {
-    background: #000000;
+    background: #2A2A2A !important;
   }
 }
