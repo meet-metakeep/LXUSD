@@ -103,9 +103,10 @@ export default function Home() {
   const [qrScanAddressDialogOpen, setQrScanAddressDialogOpen] = useState(false);
 
   // Send form state
-  const [recipientAddress, setRecipientAddress] = useState("");
+  const [recipientInput, setRecipientInput] = useState("");
   const [sendAmount, setSendAmount] = useState("1.00");
   const [isSending, setIsSending] = useState(false);
+  const [isFetchingAddress, setIsFetchingAddress] = useState(false);
 
   // QR code state
   const [qrCodeUrl, setQrCodeUrl] = useState("");
@@ -422,10 +423,142 @@ export default function Home() {
   };
 
   /**
+   * Validate if input is a valid Ethereum wallet address
+   */
+  const isValidWalletAddress = (address: string): boolean => {
+    // Check if it starts with 0x and has 42 characters (0x + 40 hex chars)
+    const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    return ethAddressRegex.test(address.trim());
+  };
+
+  /**
+   * Validate if input is a valid email address
+   */
+  const isValidEmail = (email: string): boolean => {
+    // RFC 5322 compliant email regex (simplified but secure)
+    const emailRegex =
+      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    const trimmedEmail = email.trim();
+
+    // Additional security checks
+    if (trimmedEmail.length > 254) return false; // Max email length per RFC
+    if (trimmedEmail.split("@").length !== 2) return false; // Must have exactly one @
+
+    return emailRegex.test(trimmedEmail);
+  };
+
+  /**
+   * Detect input type and validate
+   */
+  const detectInputType = (input: string): "address" | "email" | "invalid" => {
+    const trimmed = input.trim();
+
+    if (!trimmed) return "invalid";
+
+    // Check if it's a wallet address
+    if (trimmed.startsWith("0x")) {
+      return isValidWalletAddress(trimmed) ? "address" : "invalid";
+    }
+
+    // Check if it's an email
+    if (trimmed.includes("@")) {
+      return isValidEmail(trimmed) ? "email" : "invalid";
+    }
+
+    return "invalid";
+  };
+
+  /**
+   * Fetch wallet address from email using MetaKeep SDK
+   */
+  const fetchWalletFromEmail = async (
+    email: string
+  ): Promise<string | null> => {
+    try {
+      setIsFetchingAddress(true);
+
+      // Wait for MetaKeep SDK
+      if (typeof window.MetaKeep === "undefined") {
+        throw new Error("MetaKeep SDK not loaded");
+      }
+
+      // Initialize MetaKeep SDK with the user parameter
+      const sdk = new window.MetaKeep({
+        appId:
+          process.env.NEXT_PUBLIC_METAKEEP_APP_ID ||
+          "6d8968c6-397b-4ddf-8dd7-a346324900aa",
+        user: {
+          email: email,
+        },
+      });
+
+      // Get wallet address for the given email
+      // MetaKeep will return the wallet associated with this email
+      const response = await sdk.getWallet();
+
+      if (response.status === "SUCCESS" && response.wallet?.ethAddress) {
+        return response.wallet.ethAddress;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Failed to fetch wallet from email:", error);
+      showToast({
+        kind: "error",
+        message: "Please enter valid email",
+      });
+      return null;
+    } finally {
+      setIsFetchingAddress(false);
+    }
+  };
+
+  /**
    * Handle send LXUSD tokens with MetaKeep transaction signing
    */
   const handleSend = async () => {
-    if (!wallet || !recipientAddress || !sendAmount) return;
+    if (!wallet || !sendAmount || !recipientInput) return;
+
+    // Detect and validate input type
+    const inputType = detectInputType(recipientInput);
+
+    if (inputType === "invalid") {
+      showToast({
+        kind: "error",
+        message: "Please enter a valid wallet address (0x...) or email address",
+      });
+      return;
+    }
+
+    // Get the final recipient address
+    let finalRecipientAddress = recipientInput.trim();
+
+    // If input is email, fetch the wallet address first
+    if (inputType === "email") {
+      const fetchedAddress = await fetchWalletFromEmail(recipientInput.trim());
+      if (!fetchedAddress) {
+        return; // Error toast already shown in fetchWalletFromEmail
+      }
+      finalRecipientAddress = fetchedAddress;
+
+      // Validate the fetched address
+      if (!isValidWalletAddress(finalRecipientAddress)) {
+        showToast({
+          kind: "error",
+          message: "Retrieved address is invalid. Please contact support.",
+        });
+        return;
+      }
+    }
+
+    // Additional security check: ensure final address is valid
+    if (!isValidWalletAddress(finalRecipientAddress)) {
+      showToast({
+        kind: "error",
+        message: "Invalid wallet address format",
+      });
+      return;
+    }
 
     try {
       setIsSending(true);
@@ -455,7 +588,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           from: wallet.address,
-          to: recipientAddress,
+          to: finalRecipientAddress,
           amount: sendAmount,
         }),
       });
@@ -532,10 +665,14 @@ export default function Home() {
       // Sign transaction using MetaKeep SDK
       const signedTx = await sdk.signTransaction(
         transaction,
-        `Send ${sendAmount} LXUSD to ${recipientAddress.slice(
-          0,
-          6
-        )}...${recipientAddress.slice(-4)}`
+        `Send ${sendAmount} LXUSD to ${
+          inputType === "email"
+            ? recipientInput.trim()
+            : `${finalRecipientAddress.slice(
+                0,
+                6
+              )}...${finalRecipientAddress.slice(-4)}`
+        }`
       );
 
       // Check if transaction was signed successfully.
@@ -604,7 +741,7 @@ export default function Home() {
       });
 
       // Reset form
-      setRecipientAddress("");
+      setRecipientInput("");
       setSendAmount("1.00");
 
       // Refresh wallet balances after successful transaction
@@ -690,7 +827,7 @@ export default function Home() {
    * Handle QR code scan for recipient address
    */
   const handleQRCodeScan = (scannedAddress: string) => {
-    setRecipientAddress(scannedAddress);
+    setRecipientInput(scannedAddress);
     setQrScanAddressDialogOpen(false);
   };
 
@@ -835,7 +972,7 @@ export default function Home() {
               </div>
               <div>
                 <p className="text-white font-semibold">LXUSD</p>
-                <p className="text-gray-400 text-sm">Attention token</p>
+                <p className="text-gray-400 text-sm">USD Stablecoin</p>
               </div>
             </div>
             <div className="text-right">
@@ -945,17 +1082,20 @@ export default function Home() {
                   <ScanLine className="w-5 h-5 mr-2" />
                   Scan QR Code
                 </Button>
+
+                {/* Hybrid input for wallet address or email */}
                 <div>
                   <label className="text-sm text-gray-400 block mb-2 font-medium">
-                    Recipient Wallet Address
+                    Recipient Wallet Address or Email
                   </label>
                   <Input
-                    placeholder="Enter wallet address"
-                    value={recipientAddress}
-                    onChange={(e) => setRecipientAddress(e.target.value)}
+                    placeholder="0x or satoshi@example.com"
+                    value={recipientInput}
+                    onChange={(e) => setRecipientInput(e.target.value)}
                     className="bg-[#2A2A2A] border-white/10 focus:border-[#7919FF] text-white placeholder:text-gray-500 h-11 rounded-xl transition-all"
                   />
                 </div>
+
                 <div>
                   <label className="text-sm text-gray-400 block mb-2 font-medium">
                     Amount (LXUSD)
@@ -972,9 +1112,16 @@ export default function Home() {
                 <Button
                   className="w-full bg-gradient-to-r from-[#7919FF] to-[#C890FF] hover:opacity-90 text-white font-semibold py-5 text-base rounded-2xl shadow-lg shadow-[#7919FF]/30 transition-all"
                   onClick={handleSend}
-                  disabled={!recipientAddress || !sendAmount || isSending}
+                  disabled={
+                    !recipientInput ||
+                    !sendAmount ||
+                    isSending ||
+                    isFetchingAddress
+                  }
                 >
-                  {isSending ? "Sending..." : "Send LXUSD"}
+                  {isSending || isFetchingAddress
+                    ? "Processing..."
+                    : "Send LXUSD"}
                 </Button>
               </div>
             )}
